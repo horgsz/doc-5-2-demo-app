@@ -1,0 +1,55 @@
+:host {
+  // Color Customization
+  --default-idv-primary-color: #2a3e4c;
+  --default-idv-warning-color: #fbad58;
+  --default-idv-warning-foreground-color: #000000;
+  --default-idv-success-color: #00c4b3;
+  --default-idv-accent-color: #00c4b3;
+  --default-idv-body-text-color: #051c2c;
+  --default-idv-heading-text-color: #051c2c;
+
+  // Buttons
+  --default-idv-button-radius: 10px;
+  --default-idv-button-font-size: 19px;
+  --default-idv-button-font-weight: 400;
+  --default-idv-button-font-padding: 12px 0;
+  --default-idv-button-max-width: 100%;
+  --default-idv-button-text-color: #ffffff;
+
+  // Font Customization
+  --default-idv-font-family: 'Work Sans', Arial, Helvetica, sans-serif;
+
+  // ID Scan Styling
+  --default-idv-id-scan-intro-background-color: black;
+  --default-idv-id-scan-exception-background-color: black;
+  // The exception screens sit on their own black ground, so they cannot take
+  // the general text colours: those default to #051c2c for the light panels
+  // (field review, result, face-scan intro) and rendered as near-black on
+  // near-black here -- about 1.1:1, effectively invisible.
+  --default-idv-id-scan-exception-heading-color: #ffffff;
+  --default-idv-id-scan-exception-text-color: #ffffff;
+  --default-idv-id-scan-exception-button-color: var(
+    --idv-warning-color,
+    var(--default-idv-warning-color)
+  );
+  // Slate rather than plain black: over a light scene a black scrim at this
+  // alpha went muddy, while the blue-grey keeps the pill reading as a surface.
+  --default-idv-id-scan-feedback-background-color: rgba(46, 57, 66, 0.72);
+  --default-idv-id-scan-feedback-text-color: #ffffff;
+  --default-idv-id-scan-feedback-font-size: 18px;
+  --default-idv-id-scan-feedback-border-radius: 90px;
+  --default-idv-id-scan-animation-background-color: color-mix(
+    in srgb,
+    var(--idv-warning-color, var(--default-idv-warning-color)) 10%,
+    transparent
+  );
+
+  // Face Scan Styling
+  --default-idv-face-scan-intro-color: #051c2c;
+  --default-idv-face-scan-intro-grey: #4e5859;
+  --default-idv-face-scan-intro-take-selfie-icon-bg: #f5f2f5;
+  --default-idv-face-scan-intro-background: #ffffff;
+  --default-idv-face-scan-intro-label-color: #051c2c;
+  --default-idv-face-scan-modal-background: #051c2c;
+  --default-idv-face-scan-modal-label-color: #ffffff;
+}

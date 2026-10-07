@@ -1,0 +1,1160 @@
+<!doctype html>
+<!--
+  ============================================================================
+  TEST HARNESS -- NOT FOR RELEASE
+
+  This page exists to exercise the SDK by hand during development. It talks to
+  the mock session server, not a real one, and its session token is a fixture.
+  It is not part of the SDK build and must never be shipped to a customer.
+  ============================================================================
+-->
+<html dir="ltr" lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <script>
+      // Headless / hidden-tab testing only: Stencil's render queue is driven
+      // by requestAnimationFrame, and a hidden tab throttles rAF so the SDK's
+      // components never hydrate. Fall back to a timer while the tab is hidden.
+      // No effect for a real foreground user -- the real rAF is used whenever
+      // the tab is visible.
+      (function () {
+        var raf = window.requestAnimationFrame.bind(window);
+        window.requestAnimationFrame = function (cb) {
+          return document.hidden ? setTimeout(function () { cb(performance.now()); }, 16) : raf(cb);
+        };
+      })();
+    </script>
+    <script>
+      // Simulator, local testing only (NewSDK/sim). ?sim loads the virtual
+      // camera and the test driver before anything else runs, so getUserMedia
+      // is already replaced when the SDK asks for the camera. Without ?sim this
+      // does nothing, and a server that does not serve /sim just 404s them.
+      if (/[?&]sim(=|&|$)/.test(window.location.search)) {
+        document.write('<script src="/sim/simcam.js"><\/script><script src="/sim/driver.js"><\/script>');
+      }
+    </script>
+    <!--
+      Zoom is off on purpose. A double tap next to the shutter used to zoom the
+      page and leave the camera view half off screen mid-capture.
+
+      user-scalable=no is what Android Chrome honours; iOS Safari has ignored it
+      since iOS 10, so it is backed by touch-action below and the gesture
+      handlers further down. All three are needed to cover both.
+    -->
+    <meta
+      name="viewport"
+      content="width=device-width, initial-scale=1.0, minimum-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover"
+    />
+    <title>Engine v5 SDK — Test Harness</title>
+
+    <script>
+      // The third leg of the no-zoom setup. iOS Safari ignores user-scalable
+      // and touch-action does not stop a pinch, so pinch zoom is only
+      // reachable through these non-standard gesture events -- WebKit only,
+      // inert everywhere else.
+      for (const type of ['gesturestart', 'gesturechange', 'gestureend']) {
+        document.addEventListener(type, (event) => event.preventDefault(), { passive: false });
+      }
+
+      // Older iOS reaches double-tap zoom without firing a gesture event, and
+      // ignores touch-action on some elements. Two taps in the same spot inside
+      // the double-tap window get the second one swallowed; a slower second tap,
+      // or one somewhere else, is left alone so ordinary tapping still works.
+      const DOUBLE_TAP_MS = 300;
+      const DOUBLE_TAP_SLOP_PX = 40;
+      let lastTap = { time: 0, x: 0, y: 0 };
+
+      document.addEventListener(
+        'touchend',
+        (event) => {
+          if (event.touches.length > 0 || !event.changedTouches.length) {
+            return;
+          }
+
+          const touch = event.changedTouches[0];
+          const now = event.timeStamp;
+          const near =
+            Math.abs(touch.clientX - lastTap.x) < DOUBLE_TAP_SLOP_PX &&
+            Math.abs(touch.clientY - lastTap.y) < DOUBLE_TAP_SLOP_PX;
+
+          if (now - lastTap.time < DOUBLE_TAP_MS && near) {
+            event.preventDefault();
+            // Reset, so a third tap starts a fresh pair rather than counting as
+            // the first half of another double.
+            lastTap = { time: 0, x: 0, y: 0 };
+            return;
+          }
+
+          lastTap = { time: now, x: touch.clientX, y: touch.clientY };
+        },
+        { passive: false },
+      );
+    </script>
+
+    <script type="module" src="./build/idv-sdk-web-ui.esm.js"></script>
+    <script type="module">
+      import { setAssetPath } from './build/index.esm.js';
+      setAssetPath(`${window.location.origin}/`);
+    </script>
+    <script nomodule src="./build/idv-sdk-web-ui.js"></script>
+    <link rel="stylesheet" href="./build/idv-sdk-web-ui.css" />
+
+    <style>
+      :root {
+        --bg: #16191d;
+        --panel: #1e2228;
+        --line: #2c323a;
+        --ink: #e6eaef;
+        --muted: #8b95a1;
+        --accent: #4f9dd4;
+        --on: #3f9a63;
+        --off: #6b7480;
+        --warn: #c9a227;
+      }
+      * {
+        box-sizing: border-box;
+        /*
+          Kills double-tap-to-zoom, which is the one iOS Safari respects.
+          "manipulation" keeps taps and scrolling; it only drops the
+          double-tap gesture. On every element rather than just body because
+          touch-action is not inherited -- a nested element left at "auto"
+          would zoom on its own. Custom-element hosts are matched too, and the
+          host constrains its shadow content, so the camera UI is covered.
+        */
+        touch-action: manipulation;
+      }
+      body {
+        margin: 0;
+        background: var(--bg);
+        color: var(--ink);
+        font:
+          14px/1.5 -apple-system,
+          BlinkMacSystemFont,
+          'Segoe UI',
+          Roboto,
+          sans-serif;
+        padding: 0 0 56px;
+      }
+      .banner {
+        background: var(--warn);
+        color: #1a1500;
+        font-weight: 700;
+        text-align: center;
+        padding: 7px 12px;
+        font-size: 12px;
+        letter-spacing: 0.06em;
+        text-transform: uppercase;
+      }
+      .wrap {
+        max-width: 640px;
+        margin: 0 auto;
+        padding: 20px 16px;
+        display: flex;
+        flex-direction: column;
+        gap: 20px;
+      }
+      h1 {
+        font-size: 19px;
+        margin: 0;
+        font-weight: 600;
+      }
+      .sub {
+        margin: 0;
+        color: var(--muted);
+        font-size: 13px;
+      }
+      section {
+        background: var(--panel);
+        border: 1px solid var(--line);
+        border-radius: 8px;
+        padding: 14px;
+        display: flex;
+        flex-direction: column;
+        gap: 10px;
+      }
+      h2 {
+        font-size: 11px;
+        letter-spacing: 0.1em;
+        text-transform: uppercase;
+        color: var(--muted);
+        margin: 0;
+        font-weight: 600;
+      }
+      .row {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 8px;
+      }
+      button {
+        font: inherit;
+        font-size: 13px;
+        color: var(--ink);
+        background: #262c34;
+        border: 1px solid var(--line);
+        border-radius: 6px;
+        padding: 9px 13px;
+        cursor: pointer;
+        min-height: 40px;
+      }
+      button:hover:not(:disabled) {
+        border-color: var(--accent);
+      }
+      button:disabled {
+        opacity: 0.45;
+        cursor: default;
+      }
+      button:focus-visible {
+        outline: 2px solid var(--accent);
+        outline-offset: 2px;
+      }
+      button.primary {
+        background: var(--accent);
+        border-color: var(--accent);
+        color: #08131c;
+        font-weight: 600;
+      }
+      .toggle {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+      }
+      .dot {
+        width: 8px;
+        height: 8px;
+        border-radius: 50%;
+        background: var(--off);
+        flex: none;
+      }
+      .toggle[data-on='true'] .dot {
+        background: var(--on);
+      }
+      /* Three-state control: amber for auto, since "the engine decides" is
+         neither on nor off. */
+      .toggle[data-state='on'] .dot {
+        background: var(--on);
+      }
+      .toggle[data-state='auto'] .dot {
+        background: var(--warn);
+      }
+      pre {
+        margin: 0;
+        background: #12151a;
+        border: 1px solid var(--line);
+        border-radius: 6px;
+        padding: 11px;
+        font:
+          12px/1.5 ui-monospace,
+          Menlo,
+          monospace;
+        color: #b9c4d0;
+        max-height: 320px;
+        overflow: auto;
+        white-space: pre-wrap;
+        word-break: break-word;
+      }
+      .meta {
+        color: var(--muted);
+        font:
+          11px/1.5 ui-monospace,
+          Menlo,
+          monospace;
+        word-break: break-all;
+      }
+      .field {
+        display: flex;
+        flex-direction: column;
+        gap: 4px;
+      }
+      .field span {
+        font-size: 11px;
+        letter-spacing: 0.08em;
+        text-transform: uppercase;
+        color: var(--muted);
+      }
+      .field input {
+        font:
+          13px/1.4 ui-monospace,
+          Menlo,
+          monospace;
+        color: var(--ink);
+        background: #12151a;
+        border: 1px solid var(--line);
+        border-radius: 6px;
+        padding: 9px 11px;
+        min-height: 40px;
+        width: 100%;
+      }
+      .field input:focus {
+        outline: none;
+        border-color: var(--accent);
+      }
+    </style>
+  </head>
+  <body>
+    <!--
+      On-screen mirror of the engine's [perf] timing lines. The SDK worker
+      broadcasts them on a BroadcastChannel because a phone console cannot be
+      read. Fixed and high z-index so it stays visible over the SDK's
+      full-screen capture UI. Tap it to clear.
+    -->
+    <!--
+      Debug UI toggle. Fixed and max z-index so it stays tappable over the SDK's
+      full-screen capture UI -- which is exactly when speed is measured. Its
+      state persists across reloads. When on, the perf panel below mirrors the
+      engine's [perf] timing lines; when off, the panel is hidden but lines keep
+      buffering, so turning it on shows the most recent run.
+    -->
+    <button id="debugToggle" style="
+      position: fixed; top: 8px; left: 8px; z-index: 2147483647;
+      background: rgba(6, 10, 14, 0.9); color: #8a8f98;
+      font: 600 11px/1 ui-monospace, Menlo, monospace;
+      padding: 8px 11px; border-radius: 8px; border: 1px solid #333b45;
+      cursor: pointer; -webkit-appearance: none; touch-action: manipulation;">Debug UI: OFF</button>
+
+    <div id="perfPanel" style="
+      position: fixed; top: 44px; right: 8px; z-index: 2147483647;
+      max-width: 78vw; max-height: 42vh; overflow: auto;
+      background: rgba(6, 10, 14, 0.9); color: #7CFC9A;
+      font: 11px/1.35 ui-monospace, Menlo, monospace;
+      padding: 8px 10px; border-radius: 8px; border: 1px solid #1d5c33;
+      white-space: pre-wrap; pointer-events: auto; display: none;">
+    </div>
+    <script>
+      (function () {
+        var panel = document.getElementById('perfPanel');
+        var toggle = document.getElementById('debugToggle');
+        var lines = [];
+        var debugOn = false;
+        try { debugOn = localStorage.getItem('idv_debug_ui') === '1'; } catch (e) {}
+
+        // Tapping the panel clears the accumulated lines to start a fresh run.
+        panel.addEventListener('click', function () { lines = []; render(); });
+
+        function render() {
+          panel.style.display = (debugOn && lines.length) ? 'block' : 'none';
+          panel.textContent = lines.join('\n');
+        }
+
+        function syncToggle() {
+          toggle.textContent = 'Debug UI: ' + (debugOn ? 'ON' : 'OFF');
+          toggle.style.color = debugOn ? '#7CFC9A' : '#8a8f98';
+          toggle.style.borderColor = debugOn ? '#1d5c33' : '#333b45';
+        }
+
+        toggle.addEventListener('click', function () {
+          debugOn = !debugOn;
+          try { localStorage.setItem('idv_debug_ui', debugOn ? '1' : '0'); } catch (e) {}
+          syncToggle();
+          render();
+        });
+
+        syncToggle();
+
+        try {
+          var ch = new BroadcastChannel('idv-perf');
+          ch.onmessage = function (e) {
+            var t = new Date().toLocaleTimeString().split(' ')[0];
+            lines.push(t + '  ' + e.data);
+            if (lines.length > 40) lines = lines.slice(-40);
+            render();
+          };
+        } catch (err) {
+          lines.push('perf: BroadcastChannel unavailable on this browser');
+          render();
+        }
+      })();
+    </script>
+
+    <div class="banner">Test harness — mock backend — not for release</div>
+
+    <div class="wrap">
+      <div>
+        <h1>Engine v5 SDK</h1>
+        <p class="sub">Manual test harness for the web SDK.</p>
+      </div>
+
+      <section>
+        <h2>Session — connect before scanning</h2>
+        <label class="field">
+          <span>Session URL</span>
+          <input id="sessionUrl" type="text" spellcheck="false" placeholder="https://example.com" />
+        </label>
+        <label class="field">
+          <span>Session token</span>
+          <input id="sessionToken" type="text" spellcheck="false" placeholder="token" />
+        </label>
+        <label class="field">
+          <span>Build ID</span>
+          <input id="sessionBuild" type="text" spellcheck="false" placeholder="build_…" />
+        </label>
+        <div class="row">
+          <button id="connect" class="primary">Connect</button>
+          <button id="disconnect">Disconnect</button>
+          <button id="useMock">Use bundled mock</button>
+        </div>
+        <p class="sub">
+          The SDK authenticates on connect, so these have to be right before anything else works.
+          A real session endpoint needs a real token — the mock server's fixture token means
+          nothing to it, and the response comes back missing fields.
+        </p>
+      </section>
+
+      <section>
+        <h2>Run</h2>
+        <div class="row">
+          <button id="startId" class="primary" disabled>Start ID scan</button>
+          <button id="startFace" disabled>Start face scan</button>
+          <button id="close">Close</button>
+          <button id="destroy">Clear memory</button>
+        </div>
+      </section>
+
+      <section>
+        <h2>Settings — set before starting a scan</h2>
+        <div class="row">
+          <!-- Which OCR engine the session loads, to measure one against the
+               other. Switching reloads the page, so the old engine is gone. -->
+          <button id="tEngine" class="toggle" data-on="false">
+            <span class="dot"></span><span>Engine: 5.2</span>
+          </button>
+          <button id="tCapture" class="toggle" data-on="true">
+            <span class="dot"></span><span>Capture: SemiAuto</span>
+          </button>
+          <button id="tReview" class="toggle" data-on="true">
+            <span class="dot"></span><span>Field review: on</span>
+          </button>
+          <button id="tResult" class="toggle" data-on="true">
+            <span class="dot"></span><span>Result screen: on</span>
+          </button>
+          <!--
+            Three states, matching what the SDK actually accepts. "Auto" is
+            unset, which is not the same as "off": unset lets the engine ask
+            for the back only when the document has one, off forbids it.
+          -->
+          <button id="tBothSides" class="toggle" data-state="auto">
+            <span class="dot"></span><span>Scan both sides: auto</span>
+          </button>
+          <button id="tBackdrop" class="toggle" data-on="true">
+            <span class="dot"></span><span>Frame backdrop: on</span>
+          </button>
+          <button id="tRecording" class="toggle" data-on="true">
+            <span class="dot"></span><span>Recording: on</span>
+          </button>
+          <!-- Good-location probe -- green guide corners. -->
+          <button id="tGoodLocation" class="toggle" data-on="true">
+            <span class="dot"></span><span>Good-location (green): on</span>
+          </button>
+          <!-- Camera capture resolution. Semi-auto defaults to 4K; cap it to
+               1080p/720p/VGA to test the memory footprint on older devices. -->
+          <button id="tCameraRes" class="toggle" data-on="true">
+            <span class="dot"></span><span>Camera: Auto</span>
+          </button>
+        </div>
+        <p class="sub">
+          Field review, the result screen and the capture shutter apply to SemiAuto only. The
+          result screen is off by default in the SDK and on here, because reading back every
+          extracted field is what this page is for. Scan both sides cycles auto &rarr; on &rarr;
+          off: auto leaves it to the engine, which asks for the back only when the document has
+          one; on always asks, bringing up the flip animation; off never does.
+        </p>
+      </section>
+
+      <section>
+        <h2>Log</h2>
+        <div class="row">
+          <button id="clearLog">Clear</button>
+        </div>
+        <pre id="log">waiting…</pre>
+      </section>
+
+      <section>
+        <h2>Last result</h2>
+        <pre id="result">none yet</pre>
+      </section>
+
+      <section>
+        <h2>Session</h2>
+        <p class="meta" id="session"></p>
+      </section>
+    </div>
+
+    <script>
+      (function () {
+        var sdk = null;
+        var logEl = document.getElementById('log');
+        var startId = document.getElementById('startId');
+        var startFace = document.getElementById('startFace');
+        var resultEl = document.getElementById('result');
+        var lines = [];
+
+        function log(msg, data) {
+          var stamp = new Date().toISOString().slice(11, 23);
+          lines.push(stamp + '  ' + msg + (data !== undefined ? '  ' + safe(data) : ''));
+          if (lines.length > 200) lines.shift();
+          logEl.textContent = lines.join('\n');
+          logEl.scrollTop = logEl.scrollHeight;
+        }
+
+        function safe(v) {
+          try {
+            return typeof v === 'string' ? v : JSON.stringify(v);
+          } catch (e) {
+            return String(v);
+          }
+        }
+
+        // The session API defaults to wherever this page came from, which is
+        // right when the bundled mock server is serving both. It is wrong the
+        // moment the page is served by something else -- a deployment where
+        // only www/ was uploaded, say, leaving /initialise to whatever else
+        // answers on that host. ?session= points it back at the mock server.
+        //
+        //   ?session=https://host:8084     use the mock server on another port
+        //
+        // The mock server's fixtures. They are meaningful only to the bundled
+        // mock -- a real session endpoint will reject the token and answer with
+        // a partial payload, which surfaces much later as a binding error deep
+        // inside the engine.
+        var MOCK_TOKEN = 'i2R0HO0XKMEMN7';
+        var MOCK_BUILD = 'build_01KC1G7ZDMDWZ3E1GJZFZH6AB9';
+
+        var params = new URLSearchParams(window.location.search);
+        var urlEl = document.getElementById('sessionUrl');
+        var tokenEl = document.getElementById('sessionToken');
+        var buildEl = document.getElementById('sessionBuild');
+
+        // Remembered between visits, the way the React demo does it, so a real
+        // token survives a reload.
+        urlEl.value =
+          params.get('session') ||
+          localStorage.getItem('idv_session_url') ||
+          window.location.origin;
+        tokenEl.value = params.get('token') || localStorage.getItem('idv_session_token') || '';
+        buildEl.value = localStorage.getItem('idv_session_build') || MOCK_BUILD;
+
+        // Settings live here rather than on the element, because the element
+        // only exists between Connect and Disconnect.
+        var settings = {
+          semiAutoCapture: true,
+          reviewFieldIssues: true,
+          // The SDK defaults this off; the demo turns it on, because seeing
+          // what the engine actually read is the point of this page.
+          showResultScreen: true,
+          // undefined = auto: the engine asks for the back only when the
+          // document profile says it has one. Distinct from false, which
+          // forbids the back entirely.
+          scanBothSides: undefined,
+          // Record the scan session (camera video). On by default, matching the SDK.
+          enableRecording: true,
+          // The dark scrim outside the capture guide's frame. Applied as a CSS
+          // custom property on the page, not an SDK prop, so it takes effect
+          // immediately even mid-scan.
+          guideBackdrop: true,
+          // Good-location probe -- green guide corners
+          // while the ID is well placed. On here so it is visible by default.
+          goodLocation: true,
+          // The 6.0 engine instead of 5.2. The session is started under /e6,
+          // which the mock server answers with the 6.0 engine's module URLs.
+          engine6: false,
+        };
+
+        // Which of the three "scan both sides" states is showing. Kept beside
+        // `settings` because the value itself cannot be stored: the auto state
+        // is `undefined`, and JSON.stringify drops undefined properties, so a
+        // saved "auto" would come back indistinguishable from a missing key.
+        var bothSidesState = 'auto';
+        var BOTH_SIDES_VALUES = { auto: undefined, on: true, off: false };
+
+        // Camera capture resolution. CameraResolution enum: VGA=1, HD=2,
+        // FULL_HD(1080p)=3, UHD(4K)=4. "Auto" (the default) leaves cameraResolution
+        // unset so the SDK's DeviceProfiler picks per device tier before opening
+        // the camera: high=4K, mid=2K, low=1080p preview + 2K per capture. The
+        // fixed options force a resolution to test a specific device. Applied on
+        // next scan.
+        var cameraResState = 'Auto';
+        var CAMERA_RES_ORDER = ['Auto', '4K', '2K', '1080p', '720p', 'VGA'];
+        // Values are CameraResolution enum members: UHD=4, QHD(2K)=5, FULL_HD=3,
+        // HD=2, VGA=1. Auto is undefined -- "not set" is how the SDK auto-tiers.
+        var CAMERA_RES_VALUES = { Auto: undefined, '4K': 4, '2K': 5, '1080p': 3, '720p': 2, VGA: 1 };
+
+        var SETTINGS_KEY = 'idv_demo_settings';
+
+        // localStorage throws in a private window and in some embedded
+        // webviews. A demo harness losing its toggles is not worth a broken
+        // page, so both directions swallow it and fall back to the defaults.
+        function saveSettings() {
+          try {
+            localStorage.setItem(
+              SETTINGS_KEY,
+              JSON.stringify({
+                semiAutoCapture: settings.semiAutoCapture,
+                reviewFieldIssues: settings.reviewFieldIssues,
+                showResultScreen: settings.showResultScreen,
+                bothSides: bothSidesState,
+                guideBackdrop: settings.guideBackdrop,
+                enableRecording: settings.enableRecording,
+                goodLocation: settings.goodLocation,
+                cameraRes: cameraResState,
+                engine6: settings.engine6,
+              }),
+            );
+          } catch (e) {
+            /* not worth reporting; the page works either way */
+          }
+        }
+
+        function loadSettings() {
+          var saved;
+
+          try {
+            saved = JSON.parse(localStorage.getItem(SETTINGS_KEY) || 'null');
+          } catch (e) {
+            saved = null;
+          }
+
+          if (!saved) {
+            return;
+          }
+
+          // Each key is checked on its own, so a stored blob written by an
+          // older version of this page still restores what it does carry.
+          if (typeof saved.semiAutoCapture === 'boolean') {
+            settings.semiAutoCapture = saved.semiAutoCapture;
+          }
+          if (typeof saved.reviewFieldIssues === 'boolean') {
+            settings.reviewFieldIssues = saved.reviewFieldIssues;
+          }
+          if (typeof saved.showResultScreen === 'boolean') {
+            settings.showResultScreen = saved.showResultScreen;
+          }
+          if (Object.prototype.hasOwnProperty.call(BOTH_SIDES_VALUES, saved.bothSides)) {
+            bothSidesState = saved.bothSides;
+            settings.scanBothSides = BOTH_SIDES_VALUES[saved.bothSides];
+          }
+          if (typeof saved.guideBackdrop === 'boolean') {
+            settings.guideBackdrop = saved.guideBackdrop;
+          }
+          if (typeof saved.enableRecording === 'boolean') {
+            settings.enableRecording = saved.enableRecording;
+          }
+          if (typeof saved.goodLocation === 'boolean') {
+            settings.goodLocation = saved.goodLocation;
+          }
+          if (Object.prototype.hasOwnProperty.call(CAMERA_RES_VALUES, saved.cameraRes)) {
+            cameraResState = saved.cameraRes;
+          }
+          if (typeof saved.engine6 === 'boolean') {
+            settings.engine6 = saved.engine6;
+          }
+        }
+
+        loadSettings();
+
+        document.getElementById('useMock').addEventListener('click', function () {
+          urlEl.value = window.location.origin;
+          tokenEl.value = MOCK_TOKEN;
+          buildEl.value = MOCK_BUILD;
+          log('session', 'filled in the bundled mock fixtures');
+        });
+
+        /**
+         * Reports whether a session endpoint returns everything the SDK needs.
+         *
+         * A missing field is invisible until the engine rejects it with an
+         * error naming neither the field nor the session, so it is worth
+         * checking up front and saying so.
+         */
+        function checkSession(url, token) {
+          return fetch(url + '/initialise', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json', 'transaction-token': token },
+            body: '{}',
+          })
+            .then(function (r) {
+              return r.ok ? r.json() : Promise.reject(new Error('HTTP ' + r.status));
+            })
+            .then(function (p) {
+              var required = [
+                'engine_payload',
+                'module_urls',
+                'engines_base_url',
+                'engines_signed_query',
+                'assets_public_encryption_key',
+                'assets_upload_links',
+              ];
+              var absent = required.filter(function (k) {
+                return p[k] === undefined || p[k] === null;
+              });
+
+              log('session modules', Object.keys(p.module_urls || {}).join(', ') || '(none)');
+
+              if (absent.length) {
+                log('session MISSING', absent.join(', ') + '  -- the SDK will fail to authenticate');
+              } else {
+                log('session payload', 'complete');
+              }
+            })
+            .catch(function (err) {
+              log('session check failed', err.message);
+            });
+        }
+
+        // --- connect ---------------------------------------------------------
+        // The SDK authenticates in connectedCallback, so the element must not
+        // exist until the session details are known. Same reason the React demo
+        // gates the component behind its home screen.
+        // Pre-flight device check. Runs in plain ES5 so it parses even on old
+        // Safari that cannot parse the SDK bundle (?./??  need iOS 13.4). Reports
+        // the iOS version + capabilities and blocks with a clear message on a
+        // device below the SDK floor -- the real floor is MODULE WORKERS
+        // (Safari 15 / iOS 15), which the SDK requires to run the engine.
+        function deviceCapabilities() {
+          var ua = navigator.userAgent || '';
+          var m = ua.match(/OS (\d+)[._](\d+)/);
+          var iosMajor = m ? parseInt(m[1], 10) : null;
+          var hasWasm =
+            typeof WebAssembly === 'object' && typeof WebAssembly.instantiate === 'function';
+          var hasWorker = typeof Worker !== 'undefined';
+          var hasModuleWorker = false;
+          if (hasWorker && typeof URL !== 'undefined' && URL.createObjectURL && typeof Blob !== 'undefined') {
+            try {
+              var bu = URL.createObjectURL(new Blob([''], { type: 'text/javascript' }));
+              var probe = new Worker(bu, {
+                get type() {
+                  hasModuleWorker = true;
+                  return 'module';
+                },
+              });
+              probe.terminate();
+              URL.revokeObjectURL(bu);
+            } catch (e) {
+              hasModuleWorker = false;
+            }
+          }
+          return {
+            ua: ua,
+            ios: m ? m[1] + '.' + m[2] : 'n/a',
+            iosMajor: iosMajor,
+            wasm: hasWasm,
+            worker: hasWorker,
+            moduleWorker: hasModuleWorker,
+          };
+        }
+
+        function checkDeviceSupport() {
+          var c = deviceCapabilities();
+          var reasons = [];
+          if (!c.wasm) reasons.push('no WebAssembly');
+          if (!c.moduleWorker) reasons.push('no module workers (needs Safari 15 / iOS 15+)');
+          var supported = reasons.length === 0;
+          var summary =
+            'iOS ' + c.ios + '  wasm=' + c.wasm + '  moduleWorker=' + c.moduleWorker +
+            '  ua="' + c.ua + '"';
+          log(supported ? 'device check' : 'device NOT supported', summary);
+          try {
+            console.log('[idv-demo] device: ' + summary + '  supported=' + supported);
+          } catch (e) {}
+          return { supported: supported, reasons: reasons, caps: c };
+        }
+
+        function connect() {
+          if (sdk) disconnect();
+
+          var url = urlEl.value.trim().replace(/\/+$/, '');
+          var token = tokenEl.value.trim();
+
+          if (!url || !token) {
+            log('connect refused', 'session URL and token are both required');
+            return;
+          }
+
+          // Stop here on an unsupported device with a readable reason, rather
+          // than letting the SDK fail with a cryptic "Constructor ... not found".
+          var support = checkDeviceSupport();
+          if (!support.supported) {
+            log(
+              'connect refused',
+              'This device is not supported (' + support.reasons.join('; ') +
+                '). The IDVerse SDK requires iOS 15+ (or an equivalent modern browser).',
+            );
+            return;
+          }
+
+          localStorage.setItem('idv_session_url', url);
+          localStorage.setItem('idv_session_token', token);
+          localStorage.setItem('idv_session_build', buildEl.value.trim());
+
+          // The engine is chosen per session: the mock server hands out the
+          // 6.0 engine's module URLs to a session started under /e6.
+          var sessionUrl = url + (settings.engine6 ? '/e6' : '');
+          log('engine', settings.engine6 ? '6.0' : '5.2');
+
+          checkSession(sessionUrl, token);
+
+          sdk = document.createElement('idv-sdk-web');
+          sdk.setAttribute('session-url', sessionUrl);
+          sdk.setAttribute('session-token', token);
+          sdk.setAttribute('session-build-id', buildEl.value.trim());
+          sdk.setAttribute('worker-path', './IDVerseSDK.worker.min.js');
+
+          sdk.recognizers = ['id-scan', 'face-scan'];
+          sdk.enableDFA = true;
+          sdk.enableFaceMatch = true;
+          sdk.semiAutoCapture = settings.semiAutoCapture;
+          sdk.reviewFieldIssues = settings.reviewFieldIssues;
+          sdk.showResultScreen = settings.showResultScreen;
+          sdk.enableRecording = settings.enableRecording;
+          sdk.enableGoodLocation = settings.goodLocation;
+          sdk.cameraResolution = CAMERA_RES_VALUES[cameraResState];
+          // Left undefined on purpose when the toggle says auto -- assigning
+          // undefined is how "not set" reaches the engine.
+          sdk.scanBothSides = settings.scanBothSides;
+
+          wireEvents(sdk);
+          document.body.insertBefore(sdk, document.body.firstChild);
+
+          document.getElementById('session').textContent = 'connected to ' + url;
+          startId.disabled = false;
+          startFace.disabled = false;
+          log('connect', url);
+        }
+
+        function disconnect() {
+          if (!sdk) return;
+          try {
+            sdk.destroy();
+          } catch (e) {
+            /* already gone */
+          }
+          sdk.remove();
+          sdk = null;
+          startId.disabled = true;
+          startFace.disabled = true;
+          document.getElementById('session').textContent = 'not connected';
+          log('disconnect');
+        }
+
+        document.getElementById('connect').addEventListener('click', connect);
+        document.getElementById('disconnect').addEventListener('click', disconnect);
+
+        // --- toggles ---------------------------------------------------------
+        // `initial` comes from the restored settings, so the button shows what
+        // is actually in force rather than whatever the markup was authored
+        // with. apply() is deliberately not called for it: `settings` already
+        // holds the value, and there is no sdk element to push it to yet.
+        function wireToggle(id, label, apply, initial) {
+          var el = document.getElementById(id);
+
+          el.dataset.on = String(initial);
+          el.lastElementChild.textContent = label(initial);
+
+          el.addEventListener('click', function () {
+            var next = el.dataset.on !== 'true';
+            el.dataset.on = String(next);
+            el.lastElementChild.textContent = label(next);
+            apply(next);
+            saveSettings();
+            log('setting', label(next));
+          });
+        }
+
+        // Not wireToggle: switching engines reloads the page. A worker that
+        // already loaded one engine must not serve a session meant for the
+        // other, or the measurements compare an engine with itself.
+        (function wireEngine() {
+          var el = document.getElementById('tEngine');
+          var label = function (on) {
+            return 'Engine: ' + (on ? '6.0' : '5.2');
+          };
+
+          el.dataset.on = String(settings.engine6);
+          el.lastElementChild.textContent = label(settings.engine6);
+
+          el.addEventListener('click', function () {
+            settings.engine6 = !settings.engine6;
+            saveSettings();
+            log('setting', label(settings.engine6) + ' -- reloading');
+            window.location.reload();
+          });
+        })();
+
+        wireToggle(
+          'tCapture',
+          function (on) {
+            return 'Capture: ' + (on ? 'SemiAuto' : 'Live');
+          },
+          function (on) {
+            settings.semiAutoCapture = on;
+            if (sdk) sdk.semiAutoCapture = on;
+          },
+          settings.semiAutoCapture,
+        );
+
+        wireToggle(
+          'tReview',
+          function (on) {
+            return 'Field review: ' + (on ? 'on' : 'off');
+          },
+          function (on) {
+            settings.reviewFieldIssues = on;
+            if (sdk) sdk.reviewFieldIssues = on;
+          },
+          settings.reviewFieldIssues,
+        );
+
+        wireToggle(
+          'tResult',
+          function (on) {
+            return 'Result screen: ' + (on ? 'on' : 'off');
+          },
+          function (on) {
+            settings.showResultScreen = on;
+            if (sdk) sdk.showResultScreen = on;
+          },
+          settings.showResultScreen,
+        );
+
+        // Recording is a scanner setting, so a change takes effect on the next
+        // scan start (like the other capture toggles), not mid-scan.
+        wireToggle(
+          'tRecording',
+          function (on) {
+            return 'Recording: ' + (on ? 'on' : 'off');
+          },
+          function (on) {
+            settings.enableRecording = on;
+            if (sdk) sdk.enableRecording = on;
+          },
+          settings.enableRecording,
+        );
+
+        // Good-location probe. The SDK reacts live via a
+        // @Watch, so a mid-scan toggle turns the green corners on/off at once.
+        wireToggle(
+          'tGoodLocation',
+          function (on) {
+            return 'Good-location (green): ' + (on ? 'on' : 'off');
+          },
+          function (on) {
+            settings.goodLocation = on;
+            if (sdk) sdk.enableGoodLocation = on;
+          },
+          settings.goodLocation,
+        );
+
+        // Unlike the toggles above, this one acts on the page rather than the
+        // sdk element: the guide reads --idv-guide-backdrop straight through
+        // its shadow DOM, so it works mid-scan with no element to push to.
+        // That also means the restored value has to be applied once by hand
+        // below -- there is no later element creation to pick it up.
+        function applyGuideBackdrop(on) {
+          settings.guideBackdrop = on;
+          if (on) {
+            document.documentElement.style.removeProperty('--idv-guide-backdrop');
+          } else {
+            document.documentElement.style.setProperty('--idv-guide-backdrop', 'transparent');
+          }
+        }
+
+        wireToggle(
+          'tBackdrop',
+          function (on) {
+            return 'Frame backdrop: ' + (on ? 'on' : 'off');
+          },
+          applyGuideBackdrop,
+          settings.guideBackdrop,
+        );
+        applyGuideBackdrop(settings.guideBackdrop);
+
+        // Three-state, so it cannot use wireToggle. Cycles auto -> on -> off.
+        // The value handed to the SDK is undefined / true / false in that
+        // order; undefined is what leaves the decision with the engine.
+        (function wireBothSides() {
+          var el = document.getElementById('tBothSides');
+          var order = ['auto', 'on', 'off'];
+          var values = BOTH_SIDES_VALUES;
+
+          // Show the restored state before any click.
+          el.dataset.state = bothSidesState;
+          el.lastElementChild.textContent = 'Scan both sides: ' + bothSidesState;
+
+          el.addEventListener('click', function () {
+            var next = order[(order.indexOf(el.dataset.state) + 1) % order.length];
+            el.dataset.state = next;
+            el.lastElementChild.textContent = 'Scan both sides: ' + next;
+
+            bothSidesState = next;
+            settings.scanBothSides = values[next];
+            saveSettings();
+
+            // setScanBothSides() is the path that actually reaches the
+            // recognizer; assigning the property alone did nothing.
+            if (sdk && sdk.setScanBothSides) {
+              sdk.setScanBothSides(values[next]).catch(function (e) {
+                log('setScanBothSides', String(e));
+              });
+            }
+
+            log('setting', 'Scan both sides: ' + next);
+          });
+        })();
+
+        // Camera resolution cycle: 4K -> 1080p -> 720p -> VGA. Applies on the
+        // next scan start (the stream is opened then), like the other capture
+        // settings -- so change it before pressing Start ID scan.
+        (function wireCameraRes() {
+          var el = document.getElementById('tCameraRes');
+
+          el.dataset.on = 'true';
+          el.lastElementChild.textContent = 'Camera: ' + cameraResState;
+
+          el.addEventListener('click', function () {
+            var next =
+              CAMERA_RES_ORDER[
+                (CAMERA_RES_ORDER.indexOf(cameraResState) + 1) % CAMERA_RES_ORDER.length
+              ];
+            cameraResState = next;
+            el.lastElementChild.textContent = 'Camera: ' + next;
+
+            settings.cameraResolution = CAMERA_RES_VALUES[next];
+            if (sdk) sdk.cameraResolution = CAMERA_RES_VALUES[next];
+            saveSettings();
+            log('setting', 'Camera: ' + next + ' (applies on next scan)');
+          });
+        })();
+
+        // --- actions ---------------------------------------------------------
+        startId.addEventListener('click', function () {
+          if (!sdk) return log('not connected');
+          startId.disabled = true;
+          log('startIDScan');
+          // It rejects when the scan cannot run (camera refused, ...); the
+          // reason has already arrived as fatalError, so it is only logged.
+          sdk.startIDScan().catch(function (e) {
+            log('startIDScan rejected', e && (e.code || e.message || String(e)));
+          });
+        });
+
+        startFace.addEventListener('click', function () {
+          if (!sdk) return log('not connected');
+          log('startFaceScan');
+          sdk.startFaceScan();
+        });
+
+        document.getElementById('close').addEventListener('click', function () {
+          if (!sdk) return log('not connected');
+          log('close');
+          sdk.close();
+          startId.disabled = false;
+        });
+
+        document.getElementById('destroy').addEventListener('click', function () {
+          if (!sdk) return log('not connected');
+          log('destroy');
+          sdk.destroy();
+          startId.disabled = false;
+        });
+
+        document.getElementById('clearLog').addEventListener('click', function () {
+          lines = [];
+          logEl.textContent = '';
+        });
+
+        // --- SDK events ------------------------------------------------------
+        // Wired per element, since the element is created on connect.
+        function wireEvents(el) {
+          el.addEventListener('ready', function (e) {
+            log('ready', e.detail);
+          });
+
+          el.addEventListener('authenticated', function (e) {
+            log('authenticated', e.detail === true ? 'yes' : 'NO');
+
+            // The engine now warms itself: Recognizer::warmup() runs an
+            // embedded specimen card through the OCR pipeline in the worker,
+            // fired in the background when the camera flow creates its
+            // recognizer. No page-side warmup needed.
+          });
+
+          el.addEventListener('scanSuccess', function (e) {
+            log('scanSuccess', e.detail && e.detail.sdkType);
+            resultEl.textContent = safeJson(e.detail && e.detail.result);
+            startId.disabled = false;
+          });
+
+          el.addEventListener('scanFail', function (e) {
+            log('scanFail', e.detail && e.detail.sdkType);
+            resultEl.textContent = safeJson(e.detail && e.detail.result);
+            startId.disabled = false;
+          });
+
+          el.addEventListener('done', function () {
+            log('done');
+            startId.disabled = false;
+          });
+
+          el.addEventListener('fatalError', onFatalError);
+        }
+
+        function onFatalError(e) {
+          var d = e.detail || {};
+          // The SDK wraps the real failure: SdkError(code, message, cause), and
+          // the message is a fixed string like "Failed to load the SDK." that
+          // says nothing about which asset or request actually failed. The
+          // cause is where the useful part lives, so unwrap it.
+          var cause = d.stack || d.error || d.cause;
+          var detail = [d.code, d.message].filter(Boolean).join(': ');
+
+          if (cause) {
+            detail += '  <- ' + (cause.message || cause.name || safe(cause));
+          }
+
+          log('fatalError', detail || safe(d));
+          console.error('fatalError', d, 'cause:', cause);
+          probeAssets();
+          startId.disabled = false;
+        }
+
+        /**
+         * On a load failure, report which of the SDK's own assets are actually
+         * reachable. A generic "failed to load" plus four HTTP statuses is
+         * usually enough to place the fault without another round trip.
+         */
+        function probeAssets() {
+          var paths = [
+            '/initialise',
+            '/wasm/IDVerseSDK_bg.js',
+            '/wasm/IDVerseSDK_bg.wasm',
+            '/wasm/IDVerseSDK.js',
+            '/IDVerseSDK.worker.min.js',
+          ];
+
+          paths.forEach(function (p) {
+            var opts = p === '/initialise' ? { method: 'POST' } : {};
+            fetch(p, opts)
+              .then(function (r) {
+                log('  probe ' + p, r.status + ' ' + (r.headers.get('content-type') || ''));
+              })
+              .catch(function (err) {
+                log('  probe ' + p, 'FAILED ' + err.message);
+              });
+          });
+        }
+
+        function safeJson(v) {
+          try {
+            return JSON.stringify(v, null, 2);
+          } catch (e) {
+            return String(v);
+          }
+        }
+
+        window.addEventListener('error', function (e) {
+          log('window error', e.message);
+        });
+
+        log('harness loaded');
+      })();
+    </script>
+  </body>
+</html>

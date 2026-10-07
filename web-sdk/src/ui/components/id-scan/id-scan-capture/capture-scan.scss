@@ -1,0 +1,166 @@
+@import 'src/ui/global/variables';
+
+:host {
+  position: fixed;
+  inset: 0;
+  z-index: 3; // above the guide, below the feedback banner and shutter
+  display: block;
+  pointer-events: none;
+}
+
+:host(.hidden) {
+  display: none;
+}
+
+.scan-layer {
+  position: absolute;
+  inset: 0;
+  overflow: hidden;
+}
+
+// Shutter flash: one quick bloom as the frame freezes, then gone.
+.flash {
+  position: absolute;
+  inset: 0;
+  background: #ffffff;
+  opacity: 0;
+  animation: captureFlash 420ms ease-out forwards;
+}
+
+// Pulls the eye to the middle of the frozen frame while it is being read.
+.vignette {
+  position: absolute;
+  inset: 0;
+  background: radial-gradient(ellipse at center, rgba(0, 0, 0, 0) 42%, rgba(0, 0, 0, 0.55) 100%);
+  opacity: 0;
+  animation: captureFade 500ms 160ms ease-out forwards;
+}
+
+// The travelling light: a straight line. A bright edge along the top of this
+// block leads the sweep, and a glow trails down from it. Screened over the
+// frozen image so it looks like illumination, not paint.
+//
+// This block is sized and travels exactly as the wave it replaced (kept under
+// backups/wave-animation/): 46% of the frame tall, carried from 200% to -40%
+// of its own height by the component's rAF loop, so the sweep's pace and
+// reach are unchanged.
+.line {
+  --scan-glow: #ffffff;
+  --scan-edge: #ffffff;
+
+  position: absolute;
+  left: -12%;
+  right: -12%;
+  top: 0;
+  height: 46%;
+  mix-blend-mode: screen;
+  // Travel and fade are driven from the component's rAF loop (startLine) --
+  // no CSS animation, which on iOS Safari would not start reliably on the
+  // effect's first show inside a display:none subtree. This is the resting
+  // state before the loop's first frame.
+  opacity: 0;
+  transform: translateY(200%);
+
+  // The glow: brightest right under the edge, gone by the bottom of the block.
+  background: linear-gradient(
+    to bottom,
+    rgba(255, 255, 255, 0.6) 0%,
+    rgba(255, 255, 255, 0.22) 28%,
+    rgba(255, 255, 255, 0) 100%
+  );
+
+  // The edge itself. One modest shadow, not a wide one: it is composited every
+  // frame, and on phones that paint work competes with the OCR worker.
+  &::before {
+    content: '';
+    position: absolute;
+    left: 0;
+    right: 0;
+    top: 0;
+    height: 2px;
+    background: var(--scan-edge);
+    box-shadow: 0 0 5px var(--scan-edge);
+  }
+}
+
+// Faint scanline texture that rides along under the sweep.
+.grid {
+  position: absolute;
+  inset: 0;
+  mix-blend-mode: screen;
+  background-image: repeating-linear-gradient(
+    to bottom,
+    rgba(255, 255, 255, 0.05) 0px,
+    rgba(255, 255, 255, 0.05) 1px,
+    rgba(255, 255, 255, 0) 1px,
+    rgba(255, 255, 255, 0) 4px
+  );
+  opacity: 0;
+  animation: captureFadeSubtle 600ms 200ms ease-out forwards;
+}
+
+@keyframes captureFlash {
+  0% {
+    opacity: 0;
+  }
+  12% {
+    opacity: 0.85;
+  }
+  100% {
+    opacity: 0;
+  }
+}
+
+@keyframes captureFade {
+  to {
+    opacity: 1;
+  }
+}
+
+@keyframes captureFadeSubtle {
+  to {
+    opacity: 0.55;
+  }
+}
+
+// Success handoff: the line and texture fade away while a white bloom rises,
+// so the white result screen fading in on top reads as one continuous motion.
+:host(.settling) {
+  .line,
+  .grid,
+  .vignette {
+    transition: opacity 0.28s ease-out;
+    opacity: 0 !important;
+  }
+
+  .flash {
+    animation: captureSettle 420ms ease-in forwards;
+  }
+}
+
+@keyframes captureSettle {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+// Motion-sensitive users get the freeze and a still overlay, no travelling
+// light.
+@media (prefers-reduced-motion: reduce) {
+  .flash,
+  .grid {
+    animation: none;
+  }
+
+  .line {
+    display: none;
+  }
+
+  .vignette {
+    animation: none;
+    opacity: 1;
+  }
+}

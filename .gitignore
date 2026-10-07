@@ -1,0 +1,25 @@
+.DS_Store
+node_modules/
+*.log
+
+# Large engine binaries and on-demand data (unchanged, shipped with the package)
+app/models/
+app/models6/
+app/www/wasm/
+app/www/wasm6/
+
+# Prebuilt SDK / build outputs (swapped by use-local-sdk.sh; regenerate from web-sdk/src)
+app/www/build
+app/www/assets
+app/www/IDVerseSDK.worker.min.js
+app/www-prebuilt/
+web-sdk/www/
+web-sdk/dist/
+web-sdk/loader/
+web-sdk/.stencil/
+web-sdk/src/ui/assets/IDVerseSDK.worker.min.js
+
+# Local TLS cert made by start.sh
+app/cert.pem
+app/key.pem
+app/.cert-made-by-start-sh

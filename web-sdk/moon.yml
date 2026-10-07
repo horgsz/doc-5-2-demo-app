@@ -1,0 +1,26 @@
+$schema: https://moonrepo.dev/schemas/project.json
+tags:
+  - engine
+language: javascript
+fileGroups:
+  sources:
+    - src/**/*
+    - package.json
+    - package-lock.json
+    - tsconfig.json
+    - rollup.worker.config.js
+    - stencil.config.ts
+  dependencies:
+    - package.json
+    - package-lock.json
+tasks:
+  build:
+    outputs:
+      - dist
+      - loader
+    options:
+      cache: false
+      runInCI: false
+    inputs:
+      - '@group(sources)'
+    script: npm ci && npm run build

@@ -1,0 +1,145 @@
+<!doctype html>
+<html dir="ltr" lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta
+      name="viewport"
+      content="width=device-width, initial-scale=1.0, minimum-scale=1.0, maximum-scale=5.0"
+    />
+    <title>Engine v5 web SDK Demo</title>
+
+    <script type="module" src="/build/idv-sdk-web-ui.esm.js"></script>
+    <script type="module">
+      import { setAssetPath } from '/build/index.esm.js';
+      setAssetPath(`${window.location.origin}/`);
+    </script>
+
+    <script nomodule src="/build/idv-sdk-web-ui.js"></script>
+
+    <link rel="stylesheet" href="/build/idv-sdk-web-ui.css" />
+
+    <style>
+      idv-button {
+        margin-bottom: 20px;
+        display: block;
+      }
+    </style>
+  </head>
+  <body style="background-color: #444">
+    <idv-sdk-web
+      session-build-id="build_01KC1G7ZDMDWZ3E1GJZFZH6AB9"
+      session-url="https://192.168.101.217:8084"
+      session-token="i2R0HO0XKMEMN7"
+      worker-path="./IDVerseSDK.worker.min.js"
+    ></idv-sdk-web>
+    <idv-button id="button1" label="Start Document"></idv-button>
+    <idv-button id="button2" label="Start Face"></idv-button>
+    <idv-button id="button3" label="Start Digital Credentials"></idv-button>
+    <idv-button id="button4" label="Close"></idv-button>
+    <idv-button id="button5" label="Clear memory"></idv-button>
+    <idv-button id="button6" label="Capture mode: SemiAuto"></idv-button>
+    <idv-button id="button7" label="Field review: On"></idv-button>
+    <idv-button id="button8" label="Result screen: On"></idv-button>
+    <script type="text/javascript">
+      function start() {
+        const sdk = document.querySelector('idv-sdk-web');
+        const button1 = document.getElementById('button1');
+        const button2 = document.getElementById('button2');
+        const button3 = document.getElementById('button3');
+        const button4 = document.getElementById('button4');
+        const button5 = document.getElementById('button5');
+        const button6 = document.getElementById('button6');
+        const button7 = document.getElementById('button7');
+        const button8 = document.getElementById('button8');
+
+        sdk.recognizers = ['id-scan', 'face-scan', 'digital-credentials'];
+        sdk.enableDFA = true;
+        sdk.enableFaceMatch = true;
+        // The SDK ships with this off -- it is a read-back of the SDK's own
+        // output, not something an end user needs. On here, because seeing
+        // what the engine extracted is the point of this harness. Keep the
+        // button8 label in step with it.
+        sdk.showResultScreen = true;
+        // sdk.setScanBothSides(false);
+
+        sdk.addEventListener('ready', async e => {
+          console.log(`SDK ${e.detail} was successfully loaded.`);
+        });
+
+        sdk.addEventListener('scanSuccess', async e => {
+          const { sdkType, result } = e.detail;
+          console.log(sdkType, 'result', result);
+          button1.disabled = false;
+        });
+
+        sdk.addEventListener('scanFail', async e => {
+          const { sdkType, result } = e.detail;
+          console.log(sdkType, 'Failed to scan.', result);
+          button1.disabled = false;
+        });
+
+        sdk.addEventListener('done', async () => {
+          console.log('completed');
+          button1.disabled = false;
+        });
+
+        sdk.addEventListener('fatalError', e => {
+          console.error('Error', e.detail);
+          button1.disabled = false;
+        });
+
+        button1.onclick = () => {
+          button1.disabled = true;
+          sdk.startIDScan();
+          // sdk.setScanBothSides(true);
+        };
+
+        button2.onclick = () => {
+          sdk.startFaceScan();
+        };
+
+        button3.onclick = () => {
+          sdk.startDigitalCredentials('trinsic-test-deeplink', '');
+        };
+
+        button4.onclick = () => {
+          sdk.close();
+        };
+
+        button5.onclick = () => {
+          sdk.destroy();
+        };
+
+        // Live = camera scans continuously (original behaviour).
+        // SemiAuto = shutter button, one frame submitted per press.
+        // Toggle before pressing "Start Document".
+        button6.onclick = () => {
+          sdk.semiAutoCapture = !sdk.semiAutoCapture;
+          button6.label = `Capture mode: ${sdk.semiAutoCapture ? 'SemiAuto' : 'Live'}`;
+        };
+
+        // On = a capture the engine accepts but read badly stops on a review
+        // screen showing which fields, with Retake / Continue anyway.
+        // Off = an accepted capture goes straight through, as it used to.
+        // Semi-auto capture only. Toggle before pressing "Start Document".
+        button7.onclick = () => {
+          sdk.reviewFieldIssues = !sdk.reviewFieldIssues;
+          button7.label = `Field review: ${sdk.reviewFieldIssues ? 'On' : 'Off'}`;
+        };
+
+        // On (this harness starts here) = the accepted capture stops on a
+        // read-back of every extracted field, with a Done button, before the
+        // scan completes.
+        // Off (what the SDK itself defaults to) = the scan finishes straight
+        // into the success screen. Semi-auto capture only. Toggle before
+        // pressing "Start Document".
+        button8.onclick = () => {
+          sdk.showResultScreen = !sdk.showResultScreen;
+          button8.label = `Result screen: ${sdk.showResultScreen ? 'On' : 'Off'}`;
+        };
+      }
+
+      window.addEventListener('DOMContentLoaded', () => start());
+    </script>
+  </body>
+</html>

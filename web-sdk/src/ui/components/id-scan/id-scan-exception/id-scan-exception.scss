@@ -1,0 +1,149 @@
+.id-scan-exception {
+  // Fixed, not absolute: absolute rides the page, so on a phone where the
+  // browser chrome lets the document scroll, the screen scrolled up with it.
+  // Same pattern as the other full-screen overlays -- fixed on phones,
+  // absolute again in the desktop embed (media query at the bottom).
+  position: fixed;
+  width: 100%;
+  height: 100%;
+  left: 0;
+  top: 0;
+  z-index: 4;
+  overflow: hidden;
+  display: none;
+  justify-content: center;
+  align-items: center;
+  background-color: var(
+    --idv-id-scan-exception-background-color,
+    var(--default-idv-id-scan-exception-background-color)
+  );
+  text-align: center;
+  flex-direction: column;
+
+  &.no-center {
+    align-items: start;
+    padding-top: 40px;
+  }
+
+  &.visible {
+    display: flex;
+  }
+
+  .idv-animation {
+    width: 60%;
+    margin: auto;
+    margin-top: -40px;
+    max-width: 280px;
+  }
+
+  .exception-pause-animation {
+    position: relative;
+
+    .icon {
+      position: absolute;
+      margin: auto;
+      top: 0;
+      bottom: 0;
+      left: 0;
+      right: 0;
+      width: 90px;
+    }
+  }
+
+  .exception-no-id-animation {
+    .idv-animation {
+      svg path {
+        fill: var(--idv-warning-color, var(--default-idv-warning-color));
+      }
+      svg path[stroke-linecap='round'] {
+        stroke: var(--idv-warning-color, var(--default-idv-warning-color));
+      }
+    }
+  }
+
+  h1,
+  p {
+    font-family: var(--idv-font-family, var(--default-idv-font-family));
+    margin: auto;
+    width: 70%;
+    font-weight: 500;
+  }
+
+  // Scoped to this screen rather than the general text tokens: those default
+  // to #051c2c, which is right for the light panels that also use them and
+  // unreadable on this screen's black ground.
+  h1 {
+    font-size: 26px;
+    color: var(
+      --idv-id-scan-exception-heading-color,
+      var(--default-idv-id-scan-exception-heading-color)
+    );
+  }
+
+  p {
+    margin-top: 20px;
+    font-size: 19px;
+    opacity: 0.8;
+    color: var(--idv-id-scan-exception-text-color, var(--default-idv-id-scan-exception-text-color));
+  }
+
+  .exception-tips {
+    margin-top: -100px;
+
+    p {
+      width: 80%;
+    }
+  }
+
+  footer {
+    position: fixed;
+    bottom: 0;
+    width: 100%;
+    display: flex;
+    align-content: center;
+    justify-content: center;
+    gap: 10px;
+
+    button {
+      font-family: var(--idv-font-family, var(--default-idv-font-family));
+      border: 0;
+      background-color: #f3f4f6;
+      color: #374151;
+      height: 52px;
+      margin-bottom: 35px;
+      width: 100%;
+      max-width: 350px;
+      border-radius: var(--idv-button-radius, var(--default-idv-button-radius));
+      font-size: 16px;
+      font-weight: 500;
+
+      &:first-child {
+        margin-left: 20px;
+      }
+      &:last-child {
+        margin-right: 20px;
+      }
+
+      &.orange {
+        background-color: var(
+          --idv-id-scan-exception-button-color,
+          var(--default-idv-id-scan-exception-button-color)
+        );
+        color: var(--idv-warning-foreground-color, var(--default-idv-warning-foreground-color));
+      }
+    }
+  }
+}
+
+// Desktop embed only -- the height requirement keeps this off landscape
+// phones, which are wider than 800px but must stay viewport-fixed. See
+// capture-button.scss for the full story.
+@media (min-width: 800px) and (min-height: 521px) {
+  .id-scan-exception {
+    position: var(--idv-embed-position, absolute);
+  }
+
+  .id-scan-exception footer {
+    position: var(--idv-embed-position, absolute);
+  }
+}

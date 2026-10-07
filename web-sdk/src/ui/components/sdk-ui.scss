@@ -1,0 +1,13 @@
+@import 'src/ui/global/variables';
+
+* {
+  box-sizing: border-box;
+}
+
+// An iPad is in the desktop-embed range (800px+ wide, 521px+ tall) both ways
+// up, but it is held like a phone: its screens stay pinned to the viewport
+// instead of scrolling away with the page. Every desktop-embed rule takes its
+// position from this; everywhere else it falls back to absolute.
+:host(.idv-ipad) {
+  --idv-embed-position: fixed;
+}

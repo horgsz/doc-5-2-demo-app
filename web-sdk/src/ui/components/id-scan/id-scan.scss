@@ -1,0 +1,77 @@
+@import 'src/ui/global/variables';
+
+// Holds the captured frame during Semi-auto capture processing. Mirrors the
+// idv-video layout exactly (full-width, vertically centred on black) so
+// swapping between the live feed and the frozen frame is pixel-stable.
+.capture-freeze {
+  position: fixed;
+  inset: 0;
+  z-index: 2; // over the video (1), under the scan effect (3)
+  display: none;
+  align-items: center;
+  justify-content: center;
+  background: #000;
+
+  &.visible {
+    display: flex;
+  }
+
+  // Must match `.idv-video video` exactly (absolute, fill + cover) -- the
+  // canvas holds the full frame at videoWidth x videoHeight, so with the same
+  // rule its crop lines up with the live feed and the swap does not jump.
+  canvas {
+    display: block;
+    position: absolute;
+    inset: 0;
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+  }
+}
+
+// Portrait lock for the non-capture screens on a sideways phone.
+//
+// Only the capture screen re-lays out for landscape. Review, result, success
+// and the exception screens stay portrait, turned with the device the way a
+// native app with a locked orientation is -- not re-flowed, and not hidden
+// behind a "rotate your phone" prompt. The element becomes a portrait-sized
+// box (100vh wide, 100vw tall) rotated onto the landscape viewport, and the
+// panel inside attaches to it rather than the viewport: a transformed
+// ancestor is the containing block for fixed descendants, across shadow
+// boundaries included.
+//
+// Two classes because there are two landscapes. screen.orientation.angle 90
+// puts the device's top edge at the viewer's left; 270 puts it at the right.
+// The panel's top edge follows the device's.
+.portrait-locked-left,
+.portrait-locked-right {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100vh;
+  height: 100vw;
+  transform-origin: 0 0;
+  // The transform makes this a stacking context, and at z auto it paints
+  // UNDER untransformed siblings with any positive z -- the frozen-frame
+  // layer (2) and the scan effect (3) were covering the locked result screen,
+  // which read as a black screen after the last capture. Above all the
+  // capture chrome, below the hard-error modals.
+  z-index: 6;
+}
+
+.portrait-locked-left {
+  transform: rotate(-90deg) translateX(-100vh);
+}
+
+.portrait-locked-right {
+  transform: rotate(90deg) translateY(-100vw);
+}
+
+// Desktop embed only -- the height requirement keeps this off landscape
+// phones, which are wider than 800px but must stay viewport-fixed. See
+// capture-button.scss for the full story.
+@media (min-width: 800px) and (min-height: 521px) {
+  .capture-freeze {
+    position: var(--idv-embed-position, absolute);
+  }
+}

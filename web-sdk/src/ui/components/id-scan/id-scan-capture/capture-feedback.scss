@@ -1,0 +1,103 @@
+@import 'src/ui/global/variables';
+
+:host {
+  position: fixed;
+  left: 0;
+  top: 0;
+  width: 100%;
+  z-index: 4;
+  display: block;
+  pointer-events: none;
+}
+
+.feedback-bar {
+  padding: calc(16px + env(safe-area-inset-top)) 16px 0;
+  text-align: center;
+  // Slides down from the top, mirroring the way the live footer slides up.
+  transition:
+    transform 0.35s ease,
+    opacity 0.25s ease;
+}
+
+:host(.hidden) .feedback-bar {
+  transform: translateY(-140px);
+  opacity: 0;
+}
+
+:host(.visible) .feedback-bar {
+  transform: translateY(0);
+  opacity: 1;
+}
+
+// Same colours as the live feedback message, so both modes read as one
+// system; the metrics are roomier here, per the design -- this pill floats
+// alone at the top of the screen rather than sitting in a packed footer.
+.feedback-message {
+  margin: 0;
+  display: inline-block;
+  max-width: 100%;
+  box-sizing: border-box;
+  padding: 14px 30px;
+  line-height: 24px;
+  letter-spacing: 0.01em;
+  // The camera feed shows through the translucent slate; blurring it keeps
+  // the pill legible over any scene without opaquing the background.
+  -webkit-backdrop-filter: blur(10px);
+  backdrop-filter: blur(10px);
+  font-family: var(--idv-font-family, var(--default-idv-font-family));
+  font-weight: 500;
+  font-size: var(--idv-id-scan-feedback-font-size, var(--default-idv-id-scan-feedback-font-size));
+  color: var(--idv-id-scan-feedback-text-color, var(--default-idv-id-scan-feedback-text-color));
+  background-color: var(
+    --idv-id-scan-feedback-background-color,
+    var(--default-idv-id-scan-feedback-background-color)
+  );
+  border-radius: var(
+    --idv-id-scan-feedback-border-radius,
+    var(--default-idv-id-scan-feedback-border-radius)
+  );
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .feedback-bar {
+    transition: none;
+  }
+}
+
+// Phone held sideways: the banner sits in the CENTRE of the guide box rather
+// than at the top of the screen. The box is centred in the viewport (see
+// capture-guide.scss, same media query), so centring the pill on the viewport
+// puts it on the box. It fades in place instead of sliding from the top edge
+// -- a slide off-centre would read as a glitch. The host also hides it as
+// soon as the good-location probe says the document is well placed (id-scan
+// feedbackVisible), so the words never sit over a correctly framed document;
+// that rule is keyed off this same media query, so the two agree exactly.
+// Portrait is untouched: everything below is inside the landscape guard.
+@media (orientation: landscape) and (max-height: 520px) {
+  :host {
+    top: 50%;
+    left: 50%;
+    width: auto;
+    max-width: calc(100% - 32px);
+    transform: translate(-50%, -50%);
+  }
+
+  .feedback-bar {
+    padding: 0;
+    transition: opacity 0.25s ease;
+  }
+
+  :host(.hidden) .feedback-bar,
+  :host(.visible) .feedback-bar {
+    transform: none;
+  }
+}
+
+// Desktop embed only -- the height requirement keeps this off landscape
+// phones, which are wider than 800px but must stay viewport-fixed. See
+// capture-button.scss for the full story.
+@media (min-width: 800px) and (min-height: 521px) {
+  :host {
+    position: var(--idv-embed-position, absolute);
+  }
+}

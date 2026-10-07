@@ -1,0 +1,30 @@
+@import 'src/ui/global/variables';
+
+.idv-button {
+  width: 100%;
+  border-radius: var(--idv-button-radius, var(--default-idv-button-radius));
+  color: var(--idv-button-text-color, var(--default-idv-button-text-color));
+  text-align: center;
+  padding: var(--idv-button-font-padding, var(--default-idv-button-font-padding));
+  font-size: var(--idv-button-font-size, var(--default-idv-button-font-size));
+  max-width: var(--idv-button-max-width, var(--default-idv-button-max-width));
+  transform: translateY(0px);
+  border: 1px solid;
+  font-family: var(--idv-font-family, var(--default-idv-font-family));
+  font-weight: var(--idv-button-font-weight, var(--default-idv-button-font-weight));
+
+  &.primary {
+    background-color: var(--idv-primary-color, var(--default-idv-primary-color));
+    border-color: var(--idv-primary-color, var(--default-idv-primary-color));
+  }
+
+  &.outline {
+    border: 1px solid;
+    background-color: transparent;
+
+    &.primary {
+      color: var(--idv-primary-color, var(--default-idv-primary-color));
+      border-color: var(--idv-primary-color, var(--default-idv-primary-color));
+    }
+  }
+}

@@ -1,0 +1,29 @@
+* {
+  box-sizing: border-box;
+}
+
+:host {
+  .idv-dark-mode {
+    idv-face-scan-modal {
+      --idv-face-scan-modal-background: #171717;
+      --idv-face-scan-intro-color: #ffffff;
+      --idv-face-scan-modal-label-color: #ffffff;
+    }
+
+    idv-face-scan-intro {
+      --idv-face-scan-intro-take-selfie-icon-bg: #212121;
+      p {
+        color: white;
+      }
+    }
+  }
+
+  idv-animation {
+    svg {
+      .circular-progress path,
+      .highlight path {
+        stroke: var(--idv-success-color, var(--default-idv-success-color));
+      }
+    }
+  }
+}

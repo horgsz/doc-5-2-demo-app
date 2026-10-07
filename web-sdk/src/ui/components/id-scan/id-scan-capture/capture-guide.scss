@@ -1,0 +1,245 @@
+@import 'src/ui/global/variables';
+
+// The thin frame line. The brackets' geometry is derived from it, so it lives
+// in one place.
+$guide-line-width: 2px;
+
+:host {
+  position: fixed;
+  inset: 0;
+  z-index: 2; // under the feedback banner and the shutter, over the video
+  display: block;
+  pointer-events: none;
+}
+
+.guide-layer {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: opacity 0.35s ease;
+}
+
+:host(.hidden) .guide-layer {
+  opacity: 0;
+}
+
+:host(.visible) .guide-layer {
+  opacity: 1;
+}
+
+// Sized off the shorter axis so the outline fits in portrait and landscape
+// alike, with the aspect ratio supplied inline from the detected shape.
+.guide-frame {
+  position: relative;
+  width: min(84vw, 78vh);
+  max-height: 62vh;
+  // Set by the component per document shape; the landscape block below
+  // inverts it, which an inline aspect-ratio would not allow.
+  aspect-ratio: var(--guide-aspect);
+  border-radius: var(--guide-corner-radius);
+  // The detector probe can change the shape a few seconds in, and a bare
+  // aspect-ratio swap resizes the box in a single frame -- it reads as a blink
+  // rather than as the guide adjusting. Easing it makes the change legible as
+  // movement instead of a glitch. Matches the layer's own fade.
+  transition: aspect-ratio 0.35s ease;
+  // Faint fill so the target area reads as "put it here" without hiding the
+  // camera feed underneath. Overridable from outside the shadow DOM (custom
+  // properties inherit through it) -- set --idv-guide-backdrop: transparent to
+  // drop the scrim entirely.
+  box-shadow: 0 0 0 100vmax var(--idv-guide-backdrop, rgba(0, 0, 0, 0.35));
+  // Inset by its own width, which puts the line in the 2px band running INWARD
+  // from the frame edge (an outline is otherwise painted outside the box).
+  // The brackets are then centred on this line -- see the offset maths at the
+  // .corner rules.
+  outline: $guide-line-width solid rgba(255, 255, 255, 0.55);
+  outline-offset: -$guide-line-width;
+}
+
+// Document held portrait. The component inverts the
+// aspect ratio to a tall box (height > width); a narrower width keeps that
+// taller outline clear of the banner above and the shutter below, and a higher
+// height cap stops its aspect from being clamped on shorter screens. The
+// aspect-ratio itself still eases (above), so the flip from landscape reads as
+// the guide rotating rather than snapping.
+:host(.vertical) .guide-frame {
+  width: min(62vw, 48vh);
+  max-height: 80vh;
+}
+
+// Corner brackets over the outline, the usual "align here" idiom. Heavier than
+// the line they sit on and sharing its curve, so the frame reads as a thin
+// rectangle with bold rounded corners.
+.corner {
+  position: absolute;
+  // Long enough that the arc finishes and a little straight runs off each way,
+  // which is what makes it read as a bracket rather than a rounded blob. The
+  // floor is the arc itself (--guide-corner-arc, 27.5px): anything shorter and
+  // the border radius eats the whole box.
+  width: 36px;
+  height: 36px;
+  border: var(--guide-corner-width) solid var(--guide-corner-color);
+  // Above the frame's outline. Both are painted by the same element otherwise
+  // and the thin line shows through the middle of the thicker stroke.
+  z-index: 1;
+  // The bracket's arc, concentric with the frame's own corner. The bracket box
+  // is shifted OUTWARD by the same amount its radius grows here, so the two
+  // arcs share a centre -- and because that shift is half the width difference,
+  // the thin line runs through the middle of the bracket's stroke.
+  --guide-corner-arc: calc(
+    var(--guide-corner-radius) + (var(--guide-corner-width) - #{$guide-line-width}) / 2
+  );
+  // Only the way back matters: the warning arrives with the blink, which needs
+  // no easing in, and the return to ready should read as the guide calming
+  // down rather than snapping.
+  //
+  // Width is deliberately not transitioned. The offsets below are derived from
+  // it, and custom properties do not interpolate, so easing the border while
+  // the offsets jump would pull the brackets off the frame for the duration.
+  transition: border-color 0.4s ease;
+}
+
+.guide-layer {
+  // White by default, matching the outline it sits on, so the ready state is
+  // one uniform frame. Colour is then reserved for the warning: with green
+  // resting corners, a rejected frame changed one colour for another and the
+  // change was easy to miss.
+  --guide-corner-color: #ffffff;
+  // Heavier than the 2px outline they sit over: the brackets are the part that
+  // says "line the card up here", and at the same weight they vanished into
+  // the frame.
+  --guide-corner-width: 5px;
+  // Shared by the frame and the brackets so the arc and the straight edge
+  // describe the same curve -- set on only one of them they part at the joint.
+  --guide-corner-radius: 26px;
+}
+
+// The good-location probe says the ID is well placed.
+// Set on .guide-layer like the ready colour so it flows through the same var
+// and eases in via the .corner border-color transition. The tag never carries
+// both .good and .warning at once (warning wins in the component), so the
+// warning pulse is unaffected.
+:host(.good) .guide-layer {
+  --guide-corner-color: #34c759;
+}
+
+// A frame the engine turned down. The brackets rest on white and the warning
+// colour pulses over them for as long as the host keeps the class on -- a
+// couple of seconds -- then the class comes off and the transition above walks
+// them back to ready.
+//
+// White rather than a dimmed amber, because the corners stay at full strength
+// either way: fading the amber out to nothing left them disappearing into the
+// frame for half of every cycle. Colour carries the message, brightness does
+// not change.
+// Same weight in the warning state; the warning is carried by colour and the
+// pulse, not by the brackets changing size under the user.
+:host(.warning) .guide-layer {
+  --guide-corner-color: #ffffff;
+  --guide-corner-width: 5px;
+}
+
+:host(.warning) .corner {
+  // Exactly two pulses over the warning's two seconds, ending back on white,
+  // so the transition to the ready colour starts from a settled state rather
+  // than mid-fade.
+  animation: guideCornerPulse 1000ms ease-in-out infinite;
+}
+
+// The outline stays white on purpose. Recolouring it too gave the
+// brackets nothing to stand against -- an all-amber frame reads as one flat
+// shape.
+@keyframes guideCornerPulse {
+  0%,
+  100% {
+    border-color: #ffffff;
+  }
+  50% {
+    border-color: var(--idv-warning-color, var(--default-idv-warning-color));
+  }
+}
+
+// Centred on the line, not flush with the frame edge.
+//
+// The line's centreline sits half its width inside the frame edge; the
+// bracket's centreline sits half ITS width inside the bracket's own edge. For
+// the two centrelines to coincide -- the reference look, where the thin line
+// runs through the middle of the bracket's stroke and the extra weight
+// overhangs equally to both sides -- the bracket box moves outward by half the
+// width difference: (5px - 2px) / 2 = 1.5px. Its radius grows by the same
+// amount (--guide-corner-arc above) so the arcs stay concentric instead of
+// kinking apart at the joint.
+$corner-offset: calc((#{$guide-line-width} - var(--guide-corner-width)) / 2);
+
+.corner.tl {
+  top: $corner-offset;
+  left: $corner-offset;
+  border-right: 0;
+  border-bottom: 0;
+  border-top-left-radius: var(--guide-corner-arc);
+}
+
+.corner.tr {
+  top: $corner-offset;
+  right: $corner-offset;
+  border-left: 0;
+  border-bottom: 0;
+  border-top-right-radius: var(--guide-corner-arc);
+}
+
+.corner.br {
+  bottom: $corner-offset;
+  right: $corner-offset;
+  border-left: 0;
+  border-top: 0;
+  border-bottom-right-radius: var(--guide-corner-arc);
+}
+
+.corner.bl {
+  bottom: $corner-offset;
+  left: $corner-offset;
+  border-right: 0;
+  border-top: 0;
+  border-bottom-left-radius: var(--guide-corner-arc);
+}
+
+// Phone held sideways. The banner moves to the left edge (that edge was the
+// top) and the shutter to the right (that edge was the bottom), each in its
+// own stylesheet; the box keeps the document's own proportions -- horizontal,
+// following the mode -- centred in between. The height guard keeps this off
+// desktop windows, which are landscape-oriented by nature.
+@media (orientation: landscape) and (max-height: 520px) {
+  .guide-layer {
+    padding: 16px 0;
+  }
+
+  .guide-frame {
+    // Height-driven here, where width is what the side chrome competes for:
+    // 52vh keeps the box's edges clear of the pill on the left and the hint +
+    // shutter on the right across phone widths, with both of those capped in
+    // their own landscape blocks.
+    width: auto;
+    height: 100%;
+    max-height: 52vh;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .guide-layer,
+  .guide-frame,
+  .corner {
+    transition: none;
+  }
+
+  // The colour still changes -- that is the message -- but it holds steady
+  // instead of pulsing. Held on the warning colour, not the white the pulse
+  // rests on: with no animation, white alone would say nothing.
+  :host(.warning) .guide-layer {
+    --guide-corner-color: var(--idv-warning-color, var(--default-idv-warning-color));
+  }
+
+  :host(.warning) .corner {
+    animation: none;
+  }
+}

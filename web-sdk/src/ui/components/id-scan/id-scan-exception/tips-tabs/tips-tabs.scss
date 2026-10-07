@@ -1,0 +1,115 @@
+@import 'src/ui/global/variables';
+
+:host {
+  --radio-switch-width: 260px;
+  --radio-switch-height: 36px;
+  --radio-switch-padding: 0px;
+  --radio-switch-radius: 50em;
+  --radio-switch-animation-duration: 0.3s;
+}
+
+.exception-tips-tabs {
+  color: #fff;
+  font-family: var(--idv-font-family, var(--default-idv-font-family));
+
+  .radio-switch {
+    position: relative;
+    display: inline-block;
+    display: inline-flex;
+    padding: var(--radio-switch-padding);
+    border-radius: calc(var(--radio-switch-radius) * 1.4);
+    background-color: var(--idv-accent-color, var(--default-idv-accent-color));
+    color: #fff;
+    font-family: var(--idv-font-family, var(--default-idv-font-family));
+  }
+
+  li {
+    position: relative;
+    display: inline-block;
+    height: calc(var(--radio-switch-height) - 2 * var(--radio-switch-padding));
+    width: calc(var(--radio-switch-width) * 0.5 - var(--radio-switch-padding));
+  }
+
+  label {
+    position: relative;
+    z-index: 2;
+    display: flex;
+    height: 100%;
+    align-items: center;
+    justify-content: center;
+    border-radius: var(--radio-switch-radius);
+    cursor: pointer;
+    font-size: 14px;
+    font-weight: 500;
+    -webkit-user-select: none;
+    -moz-user-select: none;
+    -ms-user-select: none;
+    user-select: none;
+    transition: all var(--radio-switch-animation-duration);
+    -webkit-tap-highlight-color: rgba(0, 0, 0, 0);
+    -webkit-tap-highlight-color: transparent;
+  }
+
+  input {
+    position: absolute;
+    clip: rect(1px, 1px, 1px, 1px);
+    clip-path: inset(50%);
+    width: 1px;
+    height: 1px;
+    overflow: hidden;
+    padding: 0;
+    border: 0;
+    white-space: nowrap;
+  }
+
+  label :not(*):focus-within,
+  input:focus ~ label {
+    background-color: transparent;
+    color: var(--idv-primary-color, var(--default-idv-primary-color));
+  }
+
+  .marker {
+    position: absolute;
+    z-index: 1;
+    top: 0;
+    left: -100%;
+    border-radius: var(--radio-switch-radius);
+    background-color: #ffffff;
+    height: calc(var(--radio-switch-height) - 2 * var(--radio-switch-padding));
+    width: calc(var(--radio-switch-width) * 0.5 - var(--radio-switch-padding));
+    transition: -webkit-transform var(--radio-switch-animation-duration);
+    transition: transform var(--radio-switch-animation-duration);
+    transition:
+      transform var(--radio-switch-animation-duration),
+      -webkit-transform var(--radio-switch-animation-duration);
+  }
+
+  input:checked ~ .marker {
+    -webkit-transform: translateX(100%);
+    transform: translateX(100%);
+  }
+
+  input:checked ~ label {
+    color: var(--idv-primary-color, var(--default-idv-primary-color));
+  }
+
+  .tabs-content {
+    margin: 10px auto 40px;
+    height: 250px;
+    max-width: 340px;
+    border-radius: 14px;
+    position: relative;
+    overflow: hidden;
+
+    .content {
+      width: 100%;
+      height: 100%;
+      position: absolute;
+      left: 0;
+      top: 0;
+      background-position: center;
+      background-size: cover;
+      background-color: #ffffff;
+    }
+  }
+}

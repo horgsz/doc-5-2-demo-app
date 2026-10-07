@@ -1,0 +1,148 @@
+@import 'src/ui/global/variables';
+
+.idv-modal {
+  background: rgba(0, 0, 0, 0.7);
+  height: 0;
+  overflow: hidden;
+  position: fixed;
+  z-index: 99999;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  opacity: 0;
+  -webkit-transition: opacity 0.2s;
+  transition: opacity 0.2s;
+  display: -webkit-box;
+  display: -webkit-flex;
+  display: -ms-flexbox;
+  display: flex;
+  -webkit-box-align: center;
+  -webkit-align-items: center;
+  -ms-flex-align: center;
+  align-items: center;
+  -webkit-box-pack: center;
+  -webkit-justify-content: center;
+  -ms-flex-pack: center;
+  justify-content: center;
+  color: #333;
+
+  &.visible {
+    height: auto;
+    opacity: 1;
+  }
+
+  .modal-content {
+    outline: none;
+    opacity: 0;
+    width: 90%;
+    max-width: 380px;
+    -webkit-transform: translateY(3%);
+    transform: translateY(3%);
+    -webkit-transition:
+      opacity 0.2s,
+      -webkit-transform 0.2s;
+    transition:
+      opacity 0.2s,
+      -webkit-transform 0.2s;
+    transition:
+      opacity 0.2s,
+      transform 0.2s;
+    transition:
+      opacity 0.2s,
+      transform 0.2s,
+      -webkit-transform 0.2s;
+    max-height: calc(90vh - 1.5rem);
+    animation: slideUp 0.4s;
+
+    &.visible {
+      opacity: 1;
+      -webkit-transform: translateY(0);
+      transform: translateY(0);
+    }
+
+    .dialog {
+      min-width: 280px;
+      padding: 20px;
+      border-radius: 8px;
+      background: #fff;
+      box-shadow: none;
+      font-size: 16px;
+      line-height: 21px;
+      font-family: var(--idv-font-family, var(--default-idv-font-family));
+      text-align: center;
+
+      ::slotted(*) {
+        display: block;
+        margin-top: 12px;
+
+        &:first-child {
+          margin-top: 0;
+        }
+      }
+
+      .warning {
+        margin-top: 10px;
+        margin-bottom: -10px;
+      }
+
+      .heading {
+        margin-bottom: 20px;
+        text-align: center;
+        font-weight: bold;
+        font-size: 18px;
+        line-height: 24px;
+      }
+
+      .buttons {
+        display: flex;
+        margin-top: 30px;
+
+        .button {
+          margin: 0 10px;
+          width: auto;
+          flex: 1;
+
+          &:first-child {
+            margin-left: 0px;
+          }
+          &:last-child {
+            margin-right: 0px;
+          }
+        }
+
+        idv-button::part(idv-button) {
+          padding: 8px 0;
+          font-size: 16px;
+        }
+      }
+    }
+
+    &.small {
+      .dialog {
+        max-width: 310px;
+        min-width: inherit;
+        margin: auto;
+      }
+    }
+  }
+}
+
+@keyframes slideUp {
+  0% {
+    transform: translateY(1000px);
+    opacity: 0;
+  }
+  100% {
+    transform: translateY(0px);
+    opacity: 1;
+  }
+}
+
+@media (max-width: 760px) {
+  .idv-modal {
+    .dialog {
+      min-width: 100%;
+    }
+  }
+}

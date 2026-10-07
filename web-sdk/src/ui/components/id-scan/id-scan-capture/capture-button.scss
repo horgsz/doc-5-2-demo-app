@@ -1,0 +1,254 @@
+@import 'src/ui/global/variables';
+
+:host {
+  position: fixed;
+  left: 0;
+  bottom: 0;
+  width: 100%;
+  z-index: 4;
+  display: block;
+  pointer-events: none;
+}
+
+:host(.hidden) {
+  .capture-bar {
+    transform: translateY(220px);
+    opacity: 0;
+  }
+}
+
+:host(.visible) {
+  .capture-bar {
+    transform: translateY(0);
+    opacity: 1;
+  }
+}
+
+.capture-bar {
+  // Matches the feedback footer's slide-in so the two read as one system.
+  transition:
+    transform 0.4s ease,
+    opacity 0.3s ease;
+  // Explicit column so the hint always sits above the shutter. Relying on
+  // inline flow put them side by side whenever the viewport was wide enough
+  // to fit both on one line.
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 16px;
+  // Extra bottom room so the shutter clears the mobile browser toolbar, which
+  // overlays the viewport and is not covered by the safe-area inset.
+  padding: 0 16px calc(28px + env(safe-area-inset-bottom));
+  pointer-events: auto;
+}
+
+.capture-hint {
+  margin: 0;
+  text-align: center;
+  max-width: 100%;
+  padding: 10px 24px;
+  box-sizing: border-box;
+  font-family: var(--idv-font-family, var(--default-idv-font-family));
+  font-weight: 500;
+  line-height: 22px;
+  font-size: var(--idv-id-scan-feedback-font-size, var(--default-idv-id-scan-feedback-font-size));
+  color: var(--idv-id-scan-feedback-text-color, var(--default-idv-id-scan-feedback-text-color));
+  background-color: var(
+    --idv-id-scan-feedback-background-color,
+    var(--default-idv-id-scan-feedback-background-color)
+  );
+  border-radius: var(
+    --idv-id-scan-feedback-border-radius,
+    var(--default-idv-id-scan-feedback-border-radius)
+  );
+}
+
+.capture-button {
+  position: relative;
+  width: 74px;
+  height: 74px;
+  flex: 0 0 auto;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  -webkit-tap-highlight-color: transparent;
+
+  &:disabled {
+    cursor: default;
+  }
+}
+
+// Outer ring stays put; the inner core is what reacts to a press.
+.capture-ring {
+  position: absolute;
+  inset: 0;
+  border-radius: 50%;
+  border: 3px solid var(--idv-id-scan-feedback-text-color, #ffffff);
+  box-sizing: border-box;
+  opacity: 0.95;
+}
+
+.capture-core {
+  width: 58px;
+  height: 58px;
+  border-radius: 50%;
+  background: var(--idv-id-scan-feedback-text-color, #ffffff);
+  transition:
+    transform 0.12s ease,
+    background-color 0.2s ease;
+}
+
+// Sits dead centre of the shutter, over the white core. Absolute rather than
+// in flow so it cannot nudge the core off-centre as the digit width changes.
+.capture-countdown {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  font-family: var(--idv-font-family, var(--default-idv-font-family));
+  font-size: 30px;
+  font-weight: 700;
+  line-height: 1;
+  // Reads against the white core, so it takes the brand colour rather than the
+  // feedback colour every other part of the button uses.
+  color: var(--idv-primary-color, var(--default-idv-primary-color));
+  pointer-events: none;
+  // Digits vary in width; fixing the advance stops 4 -> 1 jittering.
+  font-variant-numeric: tabular-nums;
+  animation: captureCountdownTick 1s ease-out;
+}
+
+// The core dims slightly while counting so the digit stays legible on it.
+.capture-button.counting .capture-core {
+  background: color-mix(in srgb, var(--idv-id-scan-feedback-text-color, #ffffff) 90%, transparent);
+}
+
+@keyframes captureCountdownTick {
+  0% {
+    transform: translate(-50%, -50%) scale(1.35);
+    opacity: 0.35;
+  }
+  30% {
+    transform: translate(-50%, -50%) scale(1);
+    opacity: 1;
+  }
+  100% {
+    transform: translate(-50%, -50%) scale(1);
+    opacity: 1;
+  }
+}
+
+.capture-button:not(:disabled):active .capture-core {
+  transform: scale(0.86);
+  background: color-mix(in srgb, var(--idv-id-scan-feedback-text-color, #ffffff) 82%, black);
+}
+
+.capture-button:disabled:not(.busy) .capture-core {
+  background: color-mix(in srgb, var(--idv-id-scan-feedback-text-color, #ffffff) 45%, transparent);
+}
+
+.capture-button:disabled:not(.busy) .capture-ring {
+  opacity: 0.45;
+}
+
+// Busy: core shrinks away and the ring becomes a spinner.
+.capture-button.busy {
+  .capture-core {
+    transform: scale(0.55);
+    background: color-mix(
+      in srgb,
+      var(--idv-id-scan-feedback-text-color, #ffffff) 35%,
+      transparent
+    );
+  }
+
+  .capture-ring {
+    border-color: color-mix(
+      in srgb,
+      var(--idv-id-scan-feedback-text-color, #ffffff) 25%,
+      transparent
+    );
+    border-top-color: var(--idv-success-color, var(--default-idv-success-color));
+    animation: captureSpin 0.9s linear infinite;
+  }
+}
+
+@keyframes captureSpin {
+  from {
+    transform: rotate(0deg);
+  }
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .capture-bar {
+    transition: none;
+  }
+
+  .capture-button.busy .capture-ring {
+    animation-duration: 2.4s;
+  }
+
+  // The digit still changes every second, which is the information; only the
+  // scale-and-fade flourish goes away.
+  .capture-countdown {
+    animation: none;
+  }
+}
+
+// Phone held sideways: the shutter keeps its PHYSICAL portrait place. The
+// portrait bottom edge is the right edge of a landscape screen (rotating
+// left), so the bar stands on the right, vertically centred -- and "hint
+// above the shutter" becomes "hint left of the shutter", the same physical
+// arrangement. Button and words stay upright; only the guide box rotates.
+@media (orientation: landscape) and (max-height: 520px) {
+  :host {
+    left: auto;
+    right: 0;
+    top: 0;
+    bottom: 0;
+    width: auto;
+  }
+
+  .capture-bar {
+    height: 100%;
+    flex-direction: row;
+    align-items: center;
+    justify-content: flex-end;
+    padding: 0 calc(20px + env(safe-area-inset-right)) 0 0;
+  }
+
+  .capture-hint {
+    // Wraps at the edge instead of running under the centred guide box,
+    // which is horizontal here and claims the middle.
+    max-width: min(20vw, 140px);
+  }
+
+  // Off its own edge, not the bottom: the slide direction follows the new home.
+  :host(.hidden) .capture-bar {
+    transform: translateX(220px);
+  }
+}
+
+// Desktop embed only. Width alone is not enough: a phone held sideways is
+// wider than 800px too, and switching to absolute there re-anchors the bar to
+// whatever positioned ancestor the page has -- the shutter ends up mid-screen.
+// The height requirement is what actually separates a desktop window from a
+// landscape phone (which matches the guide's own landscape guard at 520px).
+//
+// An iPad passes both tests either way up, yet it is held like a phone: the
+// SDK root sets --idv-embed-position to fixed there (sdk-ui.scss), so these
+// rules leave its screens pinned to the viewport. Anchored to the page, they
+// scrolled with it -- the camera stopped short of the screen's edge and the
+// shutter rode up over the (fixed) guide box.
+@media (min-width: 800px) and (min-height: 521px) {
+  :host {
+    position: var(--idv-embed-position, absolute);
+  }
+}

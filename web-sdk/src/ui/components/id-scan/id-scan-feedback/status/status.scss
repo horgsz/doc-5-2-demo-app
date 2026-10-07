@@ -1,0 +1,121 @@
+@import 'src/ui/global/variables';
+
+.fb-status {
+  position: fixed;
+  left: 0;
+  top: 0;
+  width: 100%;
+  height: 100%;
+  color: white;
+  justify-content: center;
+  align-items: center;
+  flex-direction: column;
+  animation: fade 0.2s linear;
+  z-index: 4;
+  display: none;
+  font-family: var(--idv-font-family, var(--default-idv-font-family));
+
+  &.failure {
+    background-color: #fff;
+    color: #26262e;
+  }
+
+  &.visible {
+    display: flex;
+  }
+
+  h1 {
+    font-size: 24px;
+    font-family: var(--idv-font-family, var(--default-idv-font-family));
+    font-weight: 600;
+    letter-spacing: -0.5px;
+    margin: 0;
+    opacity: 1;
+    animation: fade 0.8s linear;
+  }
+
+  &.success {
+    background-color: #fff;
+    h1 {
+      color: var(--idv-primary-color, var(--default-idv-primary-color));
+    }
+  }
+
+  p {
+    width: 70%;
+    text-align: center;
+  }
+
+  idv-animation {
+    width: 190px;
+
+    .fb-animation-layer {
+      position: relative;
+    }
+
+    svg {
+      .ellipse-1 .stroke-1,
+      .shape-1 .stroke-1 {
+        stroke: var(--idv-success-color, var(--default-idv-success-color));
+      }
+    }
+  }
+
+  &.failure {
+    idv-animation {
+      width: 140px;
+    }
+
+    svg {
+      .hint-bottom .fill,
+      .hint-top .fill {
+        fill: var(--idv-warning-color, var(--default-idv-warning-color));
+      }
+
+      .circular .stroke {
+        stroke: var(--idv-warning-color, var(--default-idv-warning-color));
+      }
+    }
+  }
+
+  .buttons {
+    position: fixed;
+    left: 0;
+    bottom: 0;
+    padding: 20px 0;
+    display: flex;
+    width: 100%;
+
+    .button {
+      margin: 0 10px;
+      width: auto;
+      flex: 1;
+
+      &:first-child {
+        margin-left: 20px;
+      }
+
+      &:last-child {
+        margin-right: 20px;
+      }
+    }
+  }
+}
+
+@keyframes fade {
+  0% {
+    opacity: 0;
+  }
+  100% {
+    opacity: 1;
+  }
+}
+
+@keyframes slideLeft {
+  0% {
+    transform: translateX(900px);
+  }
+  100% {
+    transform: translateX(0px);
+  }
+}

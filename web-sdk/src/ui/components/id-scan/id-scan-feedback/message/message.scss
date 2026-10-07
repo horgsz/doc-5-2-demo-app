@@ -1,0 +1,154 @@
+footer {
+  position: fixed;
+  left: 0;
+  bottom: 0;
+  width: 100%;
+  height: 70px;
+  overflow: hidden;
+  z-index: 3;
+  text-align: center;
+
+  .feedback-message {
+    transform: translateY(0px);
+    font-size: var(--idv-id-scan-feedback-font-size, var(--default-idv-id-scan-feedback-font-size));
+    min-height: 42px;
+    line-height: 22px; // height minus vertical padding
+    border-radius: var(
+      --idv-id-scan-feedback-border-radius,
+      var(--default-idv-id-scan-feedback-border-radius)
+    );
+    color: var(--idv-id-scan-feedback-text-color, var(--default-idv-id-scan-feedback-text-color));
+    text-align: center;
+    font-family: var(--idv-font-family, var(--default-idv-font-family));
+    font-optical-sizing: auto;
+    font-weight: 500;
+    padding: 10px 35px;
+    box-sizing: border-box;
+    display: inline-block;
+    min-width: 230px;
+    overflow: hidden;
+    background-color: var(
+      --idv-id-scan-feedback-background-color,
+      var(--default-idv-id-scan-feedback-background-color)
+    );
+    position: relative;
+
+    &.uncertain {
+      color: color-mix(
+        in srgb,
+        var(--idv-warning-color, var(--default-idv-warning-color)) 43%,
+        black
+      );
+      background-color: color-mix(
+        in srgb,
+        var(--idv-warning-color, var(--default-idv-warning-color)) 18%,
+        white
+      );
+    }
+
+    .progress-bar {
+      position: absolute;
+      height: 100%;
+      background-color: var(--idv-success-color, var(--default-idv-success-color));
+      z-index: -1;
+      width: 0%;
+      top: 0;
+      left: 0;
+
+      &.static-progress-bar {
+        animation: progressBar 0.25s forwards linear;
+      }
+    }
+
+    &.scanning {
+      color: color-mix(
+        in srgb,
+        var(--idv-success-color, var(--default-idv-success-color)) 44%,
+        black
+      );
+
+      .progress-bar {
+        background-color: color-mix(
+          in srgb,
+          var(--idv-success-color, var(--default-idv-success-color)) 8%,
+          white
+        );
+      }
+    }
+
+    &.scanning::after {
+      content: '';
+      position: absolute;
+      width: 100%;
+      height: 100%;
+      top: 0;
+      left: 0;
+      background: #ffffff;
+      animation: scanning 1s linear infinite;
+    }
+  }
+
+  &.visible .feedback-message {
+    transform: translateY(200px);
+    animation: slideUp 0.4s 0.6s forwards;
+  }
+
+  &.hidden .feedback-message {
+    animation: slideDown 0.4s;
+    transform: translateY(200px);
+  }
+
+  &.hidden .force-show,
+  &.visible .force-show {
+    animation: inherit !important;
+    transform: translateY(0px);
+  }
+}
+
+@keyframes slideUp {
+  0% {
+    transform: translateY(200px);
+  }
+  100% {
+    transform: translateY(0px);
+  }
+}
+
+@keyframes slideDown {
+  0% {
+    transform: translateY(0px);
+  }
+  100% {
+    transform: translateY(900px);
+  }
+}
+
+@keyframes progressBar {
+  from {
+    width: 0%;
+  }
+  to {
+    width: 100%;
+  }
+}
+
+// Desktop embed only -- the height requirement keeps this off landscape
+// phones, which are wider than 800px but must stay viewport-fixed. See
+// capture-button.scss for the full story.
+@media (min-width: 800px) and (min-height: 521px) {
+  footer {
+    position: var(--idv-embed-position, absolute);
+  }
+}
+
+@keyframes scanning {
+  0% {
+    opacity: 0;
+  }
+  50% {
+    opacity: 0.12;
+  }
+  100% {
+    opacity: 0;
+  }
+}

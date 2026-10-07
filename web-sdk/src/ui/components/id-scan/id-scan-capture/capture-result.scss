@@ -1,0 +1,171 @@
+@import 'src/ui/global/variables';
+
+:host {
+  display: none;
+}
+
+:host(.visible) {
+  display: block;
+}
+
+// Mirrors the success status screen: full-screen white panel, primary-coloured
+// heading, same font stack.
+.capture-result {
+  position: fixed;
+  inset: 0;
+  z-index: 5;
+  background-color: #ffffff;
+  color: var(--idv-body-text-color, var(--default-idv-body-text-color));
+  font-family: var(--idv-font-family, var(--default-idv-font-family));
+  display: flex;
+  flex-direction: column;
+  // Fades in over the scan effect's white settle bloom, rising slightly, so
+  // arriving here reads as the end of the scan motion rather than a hard cut.
+  animation: captureResultFade 0.4s cubic-bezier(0.2, 0.7, 0.3, 1);
+  padding: max(28px, env(safe-area-inset-top)) 20px calc(20px + env(safe-area-inset-bottom));
+  box-sizing: border-box;
+}
+
+h1 {
+  font-size: 24px;
+  font-weight: 600;
+  letter-spacing: -0.5px;
+  margin: 4px 0 20px;
+  text-align: center;
+  color: var(--idv-primary-color, var(--default-idv-primary-color));
+}
+
+// The field list is the only part allowed to scroll, so the heading and the
+// confirm button stay put on a short screen with a long address.
+.fields {
+  flex: 1 1 auto;
+  overflow-y: auto;
+  -webkit-overflow-scrolling: touch;
+  min-height: 0;
+}
+
+.field-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  gap: 16px;
+  padding: 12px 4px;
+  border-bottom: 1px solid color-mix(in srgb, var(--idv-primary-color, #2a3e4c) 12%, transparent);
+}
+
+.field-label {
+  flex: 0 0 auto;
+  font-size: 14px;
+  font-weight: 500;
+  opacity: 0.6;
+}
+
+// Holds the value and, under it, the Latin reading of a non-Latin value.
+.field-values {
+  flex: 1 1 auto;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 2px;
+  min-width: 0;
+}
+
+.field-value {
+  text-align: right;
+  font-size: 16px;
+  font-weight: 500;
+  // Long document numbers and addresses must wrap rather than overflow.
+  word-break: break-word;
+}
+
+// The transliteration is a reading aid, not the value: same column, quieter.
+.field-transliteration {
+  text-align: right;
+  font-size: 13px;
+  font-weight: 400;
+  opacity: 0.55;
+  word-break: break-word;
+}
+
+.empty {
+  text-align: center;
+  opacity: 0.6;
+  padding: 24px 0;
+}
+
+.actions {
+  flex: 0 0 auto;
+  padding-top: 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+// Deliberately plain: this is a diagnostic escape hatch, not part of the flow,
+// so it must not compete with the confirm button.
+.download-frame {
+  align-self: center;
+  margin-top: 2px;
+  padding: 8px 12px;
+  border: 0;
+  background: none;
+  font-family: var(--idv-font-family, var(--default-idv-font-family));
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--idv-body-text-color, var(--default-idv-body-text-color));
+  opacity: 0.55;
+  text-decoration: underline;
+  cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
+
+  &:active {
+    opacity: 0.85;
+  }
+}
+
+// The expanded asset list. Indented under its button and quieter than the
+// details above it -- these are diagnostic downloads, not part of the flow.
+.asset-list {
+  align-self: center;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  text-align: center;
+}
+
+.asset-link {
+  padding: 6px 12px;
+  border: 0;
+  background: none;
+  font-family: var(--idv-font-family, var(--default-idv-font-family));
+  font-size: 13px;
+  color: var(--idv-body-text-color, var(--default-idv-body-text-color));
+  opacity: 0.55;
+  text-decoration: underline;
+  cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
+
+  &:active {
+    opacity: 0.85;
+  }
+}
+
+@keyframes captureResultFade {
+  from {
+    opacity: 0;
+    transform: translateY(14px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .capture-result {
+    animation: none;
+  }
+}

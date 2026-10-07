@@ -1,0 +1,164 @@
+@import 'src/ui/global/variables';
+
+.idv-loading {
+  width: 100%;
+  height: 100%;
+  display: none;
+  justify-content: center;
+  align-items: center;
+  z-index: 2;
+  opacity: 0;
+  animation: fade-in 0.6s 0.6s forwards;
+  background-color: none;
+
+  &.visible {
+    display: flex;
+  }
+
+  &.fixed {
+    position: fixed;
+    left: 0;
+    top: 0;
+  }
+
+  &.force-show {
+    opacity: 1;
+    animation: inherit;
+  }
+
+  // &.success {
+  //   background-color: color-mix(
+  //     in srgb,
+  //     var(--idv-success-color, var(--default-idv-success-color)) 20%,
+  //     transparent
+  //   );
+  // }
+
+  --size: 70px;
+  --loading-duration: 0.6s infinite;
+
+  > img {
+    width: 50px;
+    height: 50px;
+  }
+
+  > div {
+    width: var(--size);
+    height: var(--size);
+    border-radius: 50%;
+    border: 2px solid rgba(255, 255, 255, 0.3);
+    position: relative;
+    justify-content: center;
+    align-items: center;
+    display: none;
+
+    &.visible {
+      display: flex;
+    }
+
+    &::before,
+    &::after {
+      content: '';
+      border: 2px solid transparent;
+      border-radius: 50%;
+      width: var(--size);
+      height: var(--size);
+      position: absolute;
+    }
+
+    &::before {
+      border-top: 2px solid #ffffff;
+    }
+
+    &::after {
+      border-bottom: 2px solid #ffffff;
+    }
+
+    &.big {
+      border: 0;
+
+      &::before {
+        border-top-width: 3px;
+      }
+    }
+
+    span {
+      width: 4px;
+      height: 4px;
+      border-radius: 50%;
+      display: inline-block;
+      background-color: var(--idv-primary-color, var(--default-idv-primary-color));
+    }
+
+    &.hide-crosshair {
+      span {
+        display: none;
+      }
+    }
+
+    &::before {
+      animation: 0.6s linear infinite spinner-full;
+      border-left: 2px solid #fff;
+      border-bottom: 2px solid #fff;
+    }
+
+    &::after {
+      display: none;
+    }
+
+    &.primary {
+      &::before {
+        border-top: 2px solid var(--idv-primary-color, var(--default-idv-primary-color));
+        border-left: 2px solid var(--idv-primary-color, var(--default-idv-primary-color));
+        border-bottom: 2px solid var(--idv-primary-color, var(--default-idv-primary-color));
+      }
+
+      &::after {
+        border-bottom: 2px solid var(--idv-primary-color, var(--default-idv-primary-color));
+      }
+    }
+  }
+
+  &.success > div,
+  &.scanning > div {
+    &::before {
+      border-top: 2px solid var(--idv-success-color, var(--default-idv-success-color));
+    }
+
+    &::after {
+      border-bottom: 2px solid var(--idv-success-color, var(--default-idv-success-color));
+    }
+
+    &::before {
+      border-left: 2px solid var(--idv-success-color, var(--default-idv-success-color));
+      border-bottom: 2px solid var(--idv-success-color, var(--default-idv-success-color));
+    }
+  }
+}
+
+@keyframes spinner-full {
+  0% {
+    transform: rotate(0deg);
+  }
+  100% {
+    transform: rotate(360deg);
+  }
+}
+
+@keyframes fade-in {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+// Desktop embed only -- the height requirement keeps this off landscape
+// phones, which are wider than 800px but must stay viewport-fixed. See
+// capture-button.scss for the full story.
+@media (min-width: 800px) and (min-height: 521px) {
+  .idv-loading.fixed {
+    position: var(--idv-embed-position, absolute);
+  }
+}

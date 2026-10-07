@@ -1,0 +1,284 @@
+@import 'src/ui/global/variables';
+
+:host {
+  display: none;
+}
+
+:host(.visible) {
+  display: block;
+}
+
+// Same full-screen white panel as the capture result screen, so arriving at
+// either one from the scan effect looks like the same motion.
+.capture-issues {
+  position: fixed;
+  inset: 0;
+  z-index: 5;
+  background-color: #ffffff;
+  color: var(--idv-body-text-color, var(--default-idv-body-text-color));
+  font-family: var(--idv-font-family, var(--default-idv-font-family));
+  display: flex;
+  flex-direction: column;
+  animation: captureIssuesFade 0.4s cubic-bezier(0.2, 0.7, 0.3, 1);
+  padding: max(28px, env(safe-area-inset-top)) 20px calc(20px + env(safe-area-inset-bottom));
+  box-sizing: border-box;
+}
+
+h1 {
+  font-size: 24px;
+  font-weight: 600;
+  letter-spacing: -0.5px;
+  margin: 4px 0 8px;
+  text-align: center;
+  color: var(--idv-primary-color, var(--default-idv-primary-color));
+}
+
+.description {
+  // Centred with a measure rather than run to the full width: this is the one
+  // sentence telling the user what to do, and a short line is what makes it
+  // read as a sentence instead of a caption.
+  max-width: 30ch;
+  margin: 0 auto 18px;
+  text-align: center;
+  font-size: 17px;
+  line-height: 1.45;
+  // Was 0.65, which combined with the small size to make the instruction the
+  // faintest thing on a screen whose whole job is to be read.
+  opacity: 0.8;
+}
+
+.preview {
+  flex: 0 0 auto;
+}
+
+// The crop sets its own height from its aspect ratio, and the highlights are
+// positioned against it as percentages -- so they track the image at any size.
+.crop {
+  position: relative;
+  display: block;
+  margin: 0 auto;
+  max-width: 100%;
+  width: fit-content;
+  border-radius: 10px;
+  overflow: hidden;
+  box-shadow: 0 6px 20px rgba(0, 0, 0, 0.16);
+
+  img {
+    display: block;
+    max-width: 100%;
+    // Raised from 34vh: the crop is the evidence for everything the list
+    // claims, and at the smaller size a card with three or four issues left a
+    // tall dead band between the last row and the buttons. Growing the card
+    // spends that space on the one thing worth looking at.
+    max-height: 44vh;
+    width: auto;
+  }
+}
+
+.highlight {
+  position: absolute;
+  border-radius: 4px;
+  border: 2px solid var(--idv-primary-color, var(--default-idv-primary-color));
+  background-color: color-mix(in srgb, var(--idv-primary-color, #2a3e4c) 18%, transparent);
+  box-shadow: 0 0 0 9999px rgba(255, 255, 255, 0);
+  animation: highlightPulse 1.8s ease-in-out infinite;
+
+  // The serious kind -- nothing read at all, or a portrait that is covered or
+  // glared -- gets the warning colour rather than the brand one.
+  &.severe {
+    border-color: #e5484d;
+    background-color: rgba(229, 72, 77, 0.18);
+  }
+}
+
+// The collapsed form's one-line verdict, standing where the field list would
+// have been -- same top margin as the list, so the screen keeps its shape.
+// Same voice as the description above, weighted up a step: it replaces a whole
+// list, not a caption.
+.unclear-document {
+  margin: 16px auto 0;
+  max-width: 30ch;
+  text-align: center;
+  font-size: 17px;
+  font-weight: 600;
+  line-height: 1.45;
+}
+
+.field-list {
+  // Sized to its rows rather than stretched. Stretching left a tall dead band
+  // between the last field and the buttons on any card with only a few issues,
+  // which read as the screen having failed to finish loading. The preview
+  // above takes the slack instead, so the spare height goes around the card.
+  flex: 0 1 auto;
+  overflow-y: auto;
+  -webkit-overflow-scrolling: touch;
+  min-height: 0;
+  list-style: none;
+  margin: 16px 0 0;
+  padding: 0;
+
+  li {
+    display: flex;
+    // Centred, not baseline: the pill is a box, and baseline-aligning a box
+    // against plain text hangs it low.
+    align-items: center;
+    gap: 12px;
+    padding: 11px 4px;
+    border-bottom: 1px solid color-mix(in srgb, var(--idv-primary-color, #2a3e4c) 12%, transparent);
+  }
+}
+
+// Severity repeated at the row's left edge, so the list reads down one column.
+.field-dot {
+  flex: 0 0 auto;
+  width: 9px;
+  height: 9px;
+  border-radius: 50%;
+  background: #d97706;
+
+  &.severe {
+    background: #c81e5b;
+  }
+}
+
+.field-name {
+  // Takes the slack so the pill sits hard against the right edge.
+  flex: 1 1 auto;
+  font-size: 15px;
+  font-weight: 500;
+}
+
+.field-state {
+  flex: 0 0 auto;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 5px 11px 5px 8px;
+  border-radius: 999px;
+  font-size: 13px;
+  font-weight: 600;
+  // The engine's own wording is sentence case; the pill keeps it rather than
+  // forcing case, so "Not found" is not flattened to "not found".
+  color: #b45309;
+  background: #fdf1de;
+
+  &.severe {
+    color: #c81e5b;
+    background: #fdeaf1;
+  }
+}
+
+// Round badge carrying the ×/! so severity is not colour-only.
+//
+// Both colours are stated outright rather than leaning on currentColor: the
+// badge sets its own `color` for the glyph, so a `background: currentColor`
+// resolves against that same value and the glyph disappears into its disc.
+.field-state-icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 16px;
+  height: 16px;
+  border-radius: 50%;
+  background: #b45309;
+  color: #fdf1de;
+  font-size: 11px;
+  font-weight: 700;
+  line-height: 1;
+
+  .field-state.severe & {
+    background: #c81e5b;
+    color: #fdeaf1;
+  }
+}
+
+// Both actions are painted here, through the shared button's exposed part,
+// rather than by adding variants to the button itself: this screen's pair is
+// neutral (black over grey) instead of the brand primary, and a new variant
+// would be one more thing every other screen could accidentally pick up.
+//
+// Neither carries an outline. The border is set to match each fill rather than
+// removed, so the two keep identical heights -- the shared button reserves 1px
+// of border in its box, and dropping it on one would leave them 2px apart.
+.actions idv-button.retake::part(idv-button) {
+  background-color: #000000;
+  border-color: #000000;
+  color: #ffffff;
+}
+
+.actions idv-button.proceed::part(idv-button) {
+  background-color: #dadada;
+  border-color: #dadada;
+  color: #000000;
+}
+
+.actions {
+  flex: 0 0 auto;
+  // Pinned to the bottom. The list no longer stretches, so without this the
+  // buttons ride up under the last row and sit mid-screen on a card with only
+  // a few issues. Any slack collects above them instead -- and the crop's
+  // raised max-height is what keeps that slack small.
+  margin-top: auto;
+  padding-top: 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+// Deliberately plain: this is a diagnostic escape hatch, not part of the flow,
+// so it must not compete with Retake and Continue.
+.download-frame {
+  align-self: center;
+  margin-top: 2px;
+  padding: 8px 12px;
+  border: 0;
+  background: none;
+  font-family: var(--idv-font-family, var(--default-idv-font-family));
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--idv-body-text-color, var(--default-idv-body-text-color));
+  opacity: 0.55;
+  text-decoration: underline;
+  cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
+
+  &:active {
+    opacity: 0.85;
+  }
+}
+
+@keyframes captureIssuesFade {
+  from {
+    opacity: 0;
+    transform: translateY(14px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+// Breathes rather than blinks: a hard on/off flash over a document photo reads
+// as an error state, and these fields may well be fine.
+@keyframes highlightPulse {
+  0%,
+  100% {
+    opacity: 0.35;
+    transform: scale(1);
+  }
+  50% {
+    opacity: 1;
+    transform: scale(1.04);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .capture-issues {
+    animation: none;
+  }
+
+  .highlight {
+    animation: none;
+    opacity: 1;
+  }
+}

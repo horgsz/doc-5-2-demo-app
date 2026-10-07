@@ -1,0 +1,39 @@
+@import 'src/ui/global/variables';
+
+:host {
+  display: none;
+}
+
+.idv-flip-document {
+  position: fixed;
+  width: 100%;
+  height: 100%;
+  left: 0;
+  top: 0;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  z-index: 3;
+  flex-direction: column;
+  background: rgba($color: #000000, $alpha: 0.8);
+
+  .idv-animation {
+    > div {
+      height: 80px;
+      margin-bottom: 30px;
+    }
+
+    h1 {
+      color: #fff;
+      font-family: var(--idv-font-family, var(--default-idv-font-family));
+      font-size: 26px;
+      font-weight: 500;
+      width: 240px;
+      text-align: center;
+    }
+  }
+}
+
+:host(.visible) {
+  display: block;
+}

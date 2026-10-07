@@ -1,0 +1,53 @@
+.idv-video {
+  position: fixed;
+  width: 100%;
+  height: 100%;
+  display: none;
+  align-items: center;
+  justify-content: center;
+  top: 0;
+  left: 0;
+  background: #000;
+  text-align: center;
+  z-index: 1;
+
+  &.visible {
+    display: flex;
+  }
+
+  // Fill the viewport and crop, rather than fit the frame and letterbox. A
+  // phone camera hands back a 9:16 frame, and every current phone screen is
+  // taller than that, so `height: auto` left a black band top and bottom on
+  // a 17 Pro Max. Cropping the edges is display-only: the engine grabs the
+  // full frame off videoWidth/videoHeight (Camera.getImageData), the guide is
+  // a pure overlay with no pixel mapping, and the freeze canvas in
+  // id-scan.scss mirrors this rule so the live-to-frozen swap stays
+  // pixel-stable.
+  //
+  // Absolutely positioned, not a flex item. As a flex item the <video>'s box
+  // was still derived from the stream's intrinsic size, and WebKit derives it
+  // differently from Chromium: an iPhone 15 painted a 4K feed shrink-wrapped
+  // to a square for the ~7s iOS takes to settle the stream, then snapped to
+  // full screen on the late `resize` -- while Chromium at the same viewport
+  // was full screen from the first frame. Taking the element out of flow and
+  // pinning it to the host's edges gives it a definite box before any frame
+  // or metadata has arrived, so there is nothing for the intrinsic size to
+  // shrink-wrap.
+  video {
+    display: block;
+    position: absolute;
+    inset: 0;
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+  }
+}
+
+// Desktop embed only -- the height requirement keeps this off landscape
+// phones, which are wider than 800px but must stay viewport-fixed. See
+// capture-button.scss for the full story.
+@media (min-width: 800px) and (min-height: 521px) {
+  .idv-video {
+    position: var(--idv-embed-position, absolute);
+  }
+}
