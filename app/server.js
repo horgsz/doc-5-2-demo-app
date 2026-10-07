@@ -168,6 +168,13 @@ app.use(
 
 app.use(express.json());
 
+// Phone -> terminal relay for the test page's [perf] lines and DOM probes.
+app.post('/__log', (req, res) => {
+    const lines = Array.isArray(req.body?.lines) ? req.body.lines : [];
+    for (const l of lines) console.log(`[phone] ${String(l)}`);
+    res.status(204).end();
+});
+
 // One line per request. This is a test server whose whole job is to be watched
 // while a client misbehaves; without it, a browser failing to fetch an asset is
 // invisible from this side.

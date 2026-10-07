@@ -357,11 +357,70 @@
             lines.push(t + '  ' + e.data);
             if (lines.length > 40) lines = lines.slice(-40);
             render();
+            relay(String(e.data));
+            if (/\[perf\] video: shown/.test(String(e.data))) probeSeries();
           };
         } catch (err) {
           lines.push('perf: BroadcastChannel unavailable on this browser');
           render();
         }
+
+        // Diagnostics relay: sends [perf] lines and DOM probes to the server
+        // console (POST /__log), so a phone can be debugged from the Mac.
+        function relay(line) {
+          try {
+            fetch('/__log', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ lines: [line] }),
+            }).catch(function () {});
+          } catch (e) {}
+        }
+        function walk(root, out) {
+          var els = root.querySelectorAll('*');
+          for (var i = 0; i < els.length; i++) {
+            out.push(els[i]);
+            if (els[i].shadowRoot) walk(els[i].shadowRoot, out);
+          }
+          return out;
+        }
+        function probe(tag) {
+          var all = walk(document, []);
+          var out = ['probe ' + tag + ' inner=' + innerWidth + 'x' + innerHeight +
+            ' vv=' + (window.visualViewport ? Math.round(visualViewport.width) + 'x' + Math.round(visualViewport.height) + ' scale=' + visualViewport.scale : '-')];
+          all.forEach(function (el) {
+            var n = el.tagName.toLowerCase();
+            var media = n === 'video' || n === 'canvas' || n === 'img';
+            var cs = getComputedStyle(el);
+            var interesting = media || cs.transform !== 'none' || cs.filter !== 'none' ||
+              (cs.contain && cs.contain !== 'none') || cs.clipPath !== 'none' ||
+              (cs.maskImage && cs.maskImage !== 'none') || cs.webkitMaskImage && cs.webkitMaskImage !== 'none';
+            if (!interesting) return;
+            var b = el.getBoundingClientRect();
+            if (b.width === 0 && b.height === 0 && !media) return;
+            var path = []; var p = el;
+            for (var k = 0; k < 4 && p; k++) { path.unshift(p.tagName ? p.tagName.toLowerCase() + (p.className && typeof p.className === 'string' ? '.' + p.className.trim().split(/\s+/).join('.') : '') : '#shadow'); p = p.parentNode || p.host; }
+            var s = '  ' + path.join(' > ') + ' box=' + Math.round(b.width) + 'x' + Math.round(b.height) + '@' + Math.round(b.left) + ',' + Math.round(b.top) +
+              ' disp=' + cs.display + ' vis=' + cs.visibility + ' op=' + cs.opacity + ' z=' + cs.zIndex + ' pos=' + cs.position +
+              ' w/h=' + cs.width + '/' + cs.height + ' fit=' + cs.objectFit + ' tf=' + cs.transform + ' filt=' + cs.filter + ' clip=' + cs.clipPath +
+              ' mask=' + (cs.webkitMaskImage || cs.maskImage);
+            if (n === 'video') {
+              s += ' vwh=' + el.videoWidth + 'x' + el.videoHeight + ' paused=' + el.paused + ' rs=' + el.readyState;
+              try {
+                var tr = el.srcObject && el.srcObject.getVideoTracks()[0];
+                if (tr) s += ' track=' + JSON.stringify(tr.getSettings()) + ' enabled=' + tr.enabled;
+              } catch (e) {}
+            }
+            if (n === 'canvas') s += ' bitmap=' + el.width + 'x' + el.height;
+            if (n === 'img') s += ' nat=' + el.naturalWidth + 'x' + el.naturalHeight + ' src=' + String(el.currentSrc || el.src).slice(0, 40);
+            out.push(s);
+          });
+          out.forEach(relay);
+        }
+        function probeSeries() {
+          [500, 3000, 8000].forEach(function (ms) { setTimeout(function () { probe('t+' + ms + 'ms'); }, ms); });
+        }
+        window.__idvProbe = probe;
       })();
     </script>
 
