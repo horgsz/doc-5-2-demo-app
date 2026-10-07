@@ -421,6 +421,17 @@
           [500, 3000, 8000].forEach(function (ms) { setTimeout(function () { probe('t+' + ms + 'ms'); }, ms); });
         }
         window.__idvProbe = probe;
+        window.__idvWalk = function () { return walk(document, []); };
+        setInterval(function () {
+          fetch('/__cmd', { cache: 'no-store' }).then(function (r) { return r.json(); }).then(function (j) {
+            if (!j.code) return;
+            var res;
+            try { res = (0, eval)(j.code); } catch (e) { res = 'ERR ' + e; }
+            Promise.resolve(res).then(function (v) {
+              relay('eval> ' + (typeof v === 'string' ? v : JSON.stringify(v)));
+            }, function (e) { relay('eval! ' + e); });
+          }).catch(function () {});
+        }, 700);
       })();
     </script>
 

@@ -175,6 +175,17 @@ app.post('/__log', (req, res) => {
     res.status(204).end();
 });
 
+// Remote console: POST /__cmd {code} queues JS; the test page polls GET /__cmd,
+// evals it, and posts the result back through /__log.
+const cmdQueue = [];
+app.post('/__cmd', (req, res) => {
+    cmdQueue.push(String(req.body?.code ?? ''));
+    res.status(204).end();
+});
+app.get('/__cmd', (req, res) => {
+    res.set('Cache-Control', 'no-store').json({ code: cmdQueue.shift() ?? null });
+});
+
 // One line per request. This is a test server whose whole job is to be watched
 // while a client misbehaves; without it, a browser failing to fetch an asset is
 // invisible from this side.
