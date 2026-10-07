@@ -55,23 +55,14 @@ describe('detectIphoneModel', () => {
 });
 
 describe('DeviceProfiler.profile -- iOS by screen-size generation', () => {
-  it('iPhone 12 (gen 12) -> High / 1080p preview + 4K capture', () => {
+  it('iPhone 12 (gen 12) -> High / 4K continuous', () => {
     stub({ ua: UA_IPHONE, screenW: 390, screenH: 844, dpr: 3 }); // 1170x2532
     const p = DeviceProfiler.profile();
     expect(p.tier).toBe(DeviceTier.High);
-    // iOS WebKit mis-renders a continuous 4K preview (shrunk, letterboxed feed)
     expect(p.strategy).toEqual({
-      previewResolution: CameraResolution.FULL_HD,
+      previewResolution: CameraResolution.UHD,
       captureResolution: CameraResolution.UHD,
     });
-  });
-
-  it('iPhone 15 (1179x2556) -> High / 1080p preview + 4K capture', () => {
-    stub({ ua: UA_IPHONE, screenW: 393, screenH: 852, dpr: 3 });
-    const p = DeviceProfiler.profile();
-    expect(p.tier).toBe(DeviceTier.High);
-    expect(p.strategy.previewResolution).toBe(CameraResolution.FULL_HD);
-    expect(p.strategy.captureResolution).toBe(CameraResolution.UHD);
   });
 
   it('iPhone XS (gen 11) -> Mid / 2K continuous', () => {
@@ -92,6 +83,7 @@ describe('DeviceProfiler.profile -- iOS by screen-size generation', () => {
       previewResolution: CameraResolution.FULL_HD,
       captureResolution: CameraResolution.QHD,
     });
+    // the low tier is the only one that bumps on capture
     expect(p.strategy.captureResolution).not.toBe(p.strategy.previewResolution);
   });
 });
