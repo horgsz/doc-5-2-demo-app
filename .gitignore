@@ -23,3 +23,4 @@ web-sdk/src/ui/assets/IDVerseSDK.worker.min.js
 app/cert.pem
 app/key.pem
 app/.cert-made-by-start-sh
+changes/
