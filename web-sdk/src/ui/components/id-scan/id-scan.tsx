@@ -728,7 +728,8 @@ export class IDVerseIDScan {
     // honoured exactly, as a plain continuous stream. Otherwise semi-auto picks
     // per measured device capability BEFORE the camera opens, so a memory-tight
     // phone never opens a 4K stream it cannot afford (see DeviceProfiler): a
-    // capable device gets 4K, mid gets 2K, and a low-end one runs a 1080p
+    // capable device gets 4K (on iOS: a 1080p preview bumped to 4K per still,
+    // as WebKit mis-renders a continuous 4K preview), mid gets 2K, and a low-end one runs a 1080p
     // preview and bumps to 2K only for each still. Live mode streams at Auto.
     let previewResolution: SDKCore.CameraResolution;
     let captureResolution: SDKCore.CameraResolution | undefined;

@@ -110,7 +110,7 @@ export function detectIphoneModel(): number {
   return match ? match.v : 11;
 }
 
-/** Preview/capture pairs per tier. Low is the only tier that bumps on capture. */
+/** Preview/capture pairs per tier. High on iOS is overridden by IOS_HIGH_STRATEGY. */
 const TIER_STRATEGY: Record<DeviceTier, DeviceCaptureStrategy> = {
   [DeviceTier.High]: {
     previewResolution: CameraResolution.UHD, // 4K continuous
@@ -124,6 +124,21 @@ const TIER_STRATEGY: Record<DeviceTier, DeviceCaptureStrategy> = {
     previewResolution: CameraResolution.FULL_HD, // 1080p preview
     captureResolution: CameraResolution.QHD, // bumped to 2K per still
   },
+};
+
+/**
+ * High-tier iPhones: 1080p preview, bumped to 4K only for each still.
+ *
+ * A continuous 4K (2160x3840) preview is mis-rendered by iOS WebKit: the frame
+ * is painted as if letterboxed in its unrotated landscape size (≈393x221 pt on
+ * a 393 pt wide screen, then rotated) and stays shrunk in the middle of the
+ * screen, ignoring `object-fit: cover`, even though the <video> box itself is
+ * full-viewport. Seen on iPhone 15 (iOS Safari and in-app WebViews). A 1080p
+ * stream renders correctly, and the still keeps full 4K detail.
+ */
+const IOS_HIGH_STRATEGY: DeviceCaptureStrategy = {
+  previewResolution: CameraResolution.FULL_HD,
+  captureResolution: CameraResolution.UHD,
 };
 
 /**
@@ -149,7 +164,9 @@ export class DeviceProfiler {
   static profile(opts?: { measure?: boolean }): DeviceProfile {
     const signals = this.readSignals(!!opts?.measure);
     const { tier, reason } = this.classify(signals);
-    return { tier, reason, strategy: TIER_STRATEGY[tier], signals };
+    const strategy =
+      signals.platform === 'ios' && tier === DeviceTier.High ? IOS_HIGH_STRATEGY : TIER_STRATEGY[tier];
+    return { tier, reason, strategy, signals };
   }
 
   /** One-line summary of a profile, for logs and the perf channel. */
