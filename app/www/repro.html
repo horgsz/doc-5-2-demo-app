@@ -1,0 +1,126 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>iOS camera preview repro (no SDK)</title>
+<style>
+  html, body { margin: 0; height: 100%; background: #111; color: #fff; font: 16px -apple-system, sans-serif; }
+  /* Same structure and rules as the SDK's idv-video (idv-video.scss). */
+  .host { position: fixed; inset: 0; width: 100%; height: 100%; display: flex; align-items: center;
+          justify-content: center; background: #000; z-index: 1; }
+  .host.hidden { display: none; }
+  .host.invisible { visibility: hidden; }
+  .host.transparent { opacity: 0; }
+  .host video { display: block; position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; }
+  #lbl { position: fixed; top: 70px; left: 50%; transform: translateX(-50%); z-index: 10; background: #ff0; color: #000;
+         font: bold 30px -apple-system, sans-serif; padding: 8px 16px; border-radius: 10px; white-space: nowrap; }
+  #start { position: fixed; bottom: 60px; left: 50%; transform: translateX(-50%); z-index: 10; font-size: 22px;
+           padding: 14px 28px; border-radius: 12px; border: 0; background: #0a84ff; color: #fff; }
+</style>
+</head>
+<body>
+<div class="host hidden" id="host"><video id="v" muted playsinline></video></div>
+<div id="lbl">Tap Start</div>
+<button id="start">Start</button>
+<script>
+  var v = document.getElementById('v'), host = document.getElementById('host'), L = document.getElementById('lbl');
+  var stream = null;
+  function relay(line) {
+    fetch('/__log', { method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ lines: ['[repro] ' + line] }) }).catch(function () {});
+  }
+  function geo(tag) {
+    var t = stream && stream.getVideoTracks()[0];
+    var b = v.getBoundingClientRect();
+    relay(tag + ' box=' + Math.round(b.width) + 'x' + Math.round(b.height) + ' vwh=' + v.videoWidth + 'x' + v.videoHeight +
+      ' enabled=' + (t && t.enabled) + ' settings=' + (t ? JSON.stringify(t.getSettings()) : '-'));
+  }
+  function label(s) { L.textContent = s; relay('STEP ' + s); }
+  var sleep = function (ms) { return new Promise(function (r) { setTimeout(r, ms); }); };
+
+  // Restore a correct picture between steps: hold a style change long enough
+  // for WebKit to redo the video layer (600 ms was enough on device).
+  async function reset() {
+    v.style.objectFit = 'fill'; await sleep(800); v.style.objectFit = ''; await sleep(800);
+  }
+
+  async function open() {
+    stream = await navigator.mediaDevices.getUserMedia({ audio: false,
+      video: { width: 3840, facingMode: { ideal: 'environment' } } });
+    v.srcObject = stream;
+    await v.play();
+  }
+
+  async function reopen(hidden, fade) {
+    if (stream) stream.getTracks().forEach(function (t) { t.stop(); });
+    v.srcObject = null; v.style.transition = ''; v.style.opacity = fade ? '0' : '';
+    if (hidden) host.classList.add('hidden'); else host.classList.remove('hidden');
+    await open();
+    host.classList.remove('hidden');
+    if (fade) { await sleep(500); v.style.transition = 'opacity 1s'; v.style.opacity = '1'; }
+  }
+  async function reopenCls(cls) {
+    if (stream) stream.getTracks().forEach(function (t) { t.stop(); });
+    v.srcObject = null; host.classList.add(cls);
+    await open();
+    await sleep(300);
+    host.classList.remove(cls);
+  }
+  var fr = document.createElement('div');
+  fr.style.cssText = 'position:fixed;inset:0;z-index:2;background:#000;display:none';
+  var fc = document.createElement('canvas');
+  fc.style.cssText = 'position:absolute;inset:0;width:100%;height:100%;object-fit:cover';
+  fr.appendChild(fc); document.body.appendChild(fr);
+
+  var steps = {
+    async A() { await reopen(false, false); },
+    async B() { await reopen(true, false); },
+    async C() { await reopen(false, true); },
+    async D() { await reopen(true, true); },
+    // The SDK's capture: freeze overlay drawn from the video, track off while
+    // the engine runs, then overlay dropped and track back on.
+    // Hidden with visibility / opacity instead of display:none while opening.
+    async G() { await reopenCls('invisible'); },
+    async H() { await reopenCls('transparent'); },
+    async E() {
+      var t = stream.getVideoTracks()[0];
+      fc.width = v.videoWidth; fc.height = v.videoHeight; fc.getContext('2d').drawImage(v, 0, 0);
+      fr.style.display = 'block'; t.enabled = false;
+      await sleep(2000);
+      t.enabled = true; fr.style.display = 'none';
+    },
+    async F() {
+      var mr = new MediaRecorder(stream); mr.start(1000); await sleep(2000); mr.stop();
+    },
+  };
+
+  async function run() {
+    relay('UA ' + navigator.userAgent);
+    var order = [['1 H opacity:0', 'H'], ['2 H opacity:0', 'H'], ['3 B display:none', 'B'],
+                 ['4 H opacity:0', 'H'], ['5 H opacity:0', 'H'], ['6 B display:none', 'B']];
+    for (var i = 0; i < order.length; i++) {
+      if (i > 0) { label('reset…'); await reset(); }
+      label(order[i][0]);
+      try { await steps[order[i][1]](); } catch (e) { relay('ERR ' + order[i][1] + ' ' + e); label(order[i][0] + ' ERR'); }
+      await sleep(1000); geo(order[i][0] + ' +1s');
+      await sleep(5000); geo(order[i][0] + ' +6s');
+    }
+    label('DONE');
+  }
+
+  document.getElementById('start').addEventListener('click', function () {
+    this.style.display = 'none'; run();
+  });
+
+  // Remote console, same as the test page.
+  setInterval(function () {
+    fetch('/__cmd', { cache: 'no-store' }).then(function (r) { return r.json(); }).then(function (j) {
+      if (!j.code) return;
+      var res; try { res = (0, eval)(j.code); } catch (e) { res = 'ERR ' + e; }
+      Promise.resolve(res).then(function (x) { relay('eval> ' + (typeof x === 'string' ? x : JSON.stringify(x))); });
+    }).catch(function () {});
+  }, 700);
+</script>
+</body>
+</html>

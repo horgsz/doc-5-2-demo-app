@@ -421,6 +421,33 @@
           [500, 3000, 8000].forEach(function (ms) { setTimeout(function () { probe('t+' + ms + 'ms'); }, ms); });
         }
         window.__idvProbe = probe;
+        // Ancestor chain (across shadow roots) of a <video> when it gets a
+        // stream, and again when it starts playing: which boxes are hidden.
+        function chain(el) {
+          var out = [], n = el;
+          while (n && n.nodeType === 1) {
+            var cs = getComputedStyle(n);
+            if (cs.display === 'none' || cs.visibility !== 'visible' || cs.opacity !== '1' || n === el)
+              out.push(n.tagName.toLowerCase() + (typeof n.className === 'string' && n.className ? '.' + n.className.trim().split(/\s+/).join('.') : '') +
+                '[d=' + cs.display + ' v=' + cs.visibility + ' o=' + cs.opacity + ']');
+            n = n.parentNode && n.parentNode.nodeType === 11 ? n.parentNode.host : n.parentNode;
+          }
+          return out.join(' < ') || '(all visible)';
+        }
+        try {
+          var desc = Object.getOwnPropertyDescriptor(HTMLMediaElement.prototype, 'srcObject');
+          Object.defineProperty(HTMLMediaElement.prototype, 'srcObject', {
+            configurable: true, get: desc.get,
+            set: function (s) {
+              desc.set.call(this, s);
+              if (s && this.tagName === 'VIDEO') {
+                var el = this;
+                relay('[attach] srcObject set: ' + chain(el));
+                el.addEventListener('playing', function () { relay('[attach] playing: ' + chain(el)); }, { once: true });
+              }
+            },
+          });
+        } catch (e) { relay('[attach] hook failed ' + e); }
         window.__idvWalk = function () { return walk(document, []); };
         setInterval(function () {
           fetch('/__cmd', { cache: 'no-store' }).then(function (r) { return r.json(); }).then(function (j) {
