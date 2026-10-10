@@ -562,15 +562,23 @@ export namespace Components {
      * then rotated -- while its box, object-fit and videoWidth/videoHeight are all
      * correct. Once stuck, that element stays stuck: re-attaching the stream does
      * not fix it, and it carries over to the back of the card and to retakes.
-     * The SDK attaches the stream before it shows the preview, which is the
-     * pattern that triggers it (reproduced without the SDK: attach while
-     * display:none, then show). On the same page, the same stream on a new
-     * element attached while visible was drawn correctly every time.
+     * It happens to an element that is given the stream while it is not on
+     * screen: the SDK opens the camera before it shows the preview (reproduced
+     * without the SDK: attach while display:none, then show), and keeps the feed
+     * running under the frozen capture and the review screen. On the same page,
+     * the same stream on a new element attached while the preview was showing
+     * was drawn correctly every time. So a new display element is attached when
+     * the stream starts with the preview showing, when the preview is shown, and
+     * whenever the SDK reveals the live feed again (refreshDisplay()).
      * The display element is native video compositing, as before -- no per-frame
      * script and no canvas -- so it costs no more than the old preview.
      */
     interface IdvVideo {
         "getVideoRef": () => Promise<HTMLVideoElement>;
+        /**
+          * Attaches a new display element. Call once the live feed is uncovered again (after the screen has updated), e.g. when a frozen capture is dropped for a retake; the current one stays until the new one has a frame.
+         */
+        "refreshDisplay": () => Promise<void>;
         "visible": boolean;
     }
     interface IdvWarningOutlineIcon {
@@ -1002,10 +1010,14 @@ declare global {
      * then rotated -- while its box, object-fit and videoWidth/videoHeight are all
      * correct. Once stuck, that element stays stuck: re-attaching the stream does
      * not fix it, and it carries over to the back of the card and to retakes.
-     * The SDK attaches the stream before it shows the preview, which is the
-     * pattern that triggers it (reproduced without the SDK: attach while
-     * display:none, then show). On the same page, the same stream on a new
-     * element attached while visible was drawn correctly every time.
+     * It happens to an element that is given the stream while it is not on
+     * screen: the SDK opens the camera before it shows the preview (reproduced
+     * without the SDK: attach while display:none, then show), and keeps the feed
+     * running under the frozen capture and the review screen. On the same page,
+     * the same stream on a new element attached while the preview was showing
+     * was drawn correctly every time. So a new display element is attached when
+     * the stream starts with the preview showing, when the preview is shown, and
+     * whenever the SDK reveals the live feed again (refreshDisplay()).
      * The display element is native video compositing, as before -- no per-frame
      * script and no canvas -- so it costs no more than the old preview.
      */
@@ -1579,10 +1591,14 @@ declare namespace LocalJSX {
      * then rotated -- while its box, object-fit and videoWidth/videoHeight are all
      * correct. Once stuck, that element stays stuck: re-attaching the stream does
      * not fix it, and it carries over to the back of the card and to retakes.
-     * The SDK attaches the stream before it shows the preview, which is the
-     * pattern that triggers it (reproduced without the SDK: attach while
-     * display:none, then show). On the same page, the same stream on a new
-     * element attached while visible was drawn correctly every time.
+     * It happens to an element that is given the stream while it is not on
+     * screen: the SDK opens the camera before it shows the preview (reproduced
+     * without the SDK: attach while display:none, then show), and keeps the feed
+     * running under the frozen capture and the review screen. On the same page,
+     * the same stream on a new element attached while the preview was showing
+     * was drawn correctly every time. So a new display element is attached when
+     * the stream starts with the preview showing, when the preview is shown, and
+     * whenever the SDK reveals the live feed again (refreshDisplay()).
      * The display element is native video compositing, as before -- no per-frame
      * script and no canvas -- so it costs no more than the old preview.
      */
@@ -1710,10 +1726,14 @@ declare module "@stencil/core" {
              * then rotated -- while its box, object-fit and videoWidth/videoHeight are all
              * correct. Once stuck, that element stays stuck: re-attaching the stream does
              * not fix it, and it carries over to the back of the card and to retakes.
-             * The SDK attaches the stream before it shows the preview, which is the
-             * pattern that triggers it (reproduced without the SDK: attach while
-             * display:none, then show). On the same page, the same stream on a new
-             * element attached while visible was drawn correctly every time.
+             * It happens to an element that is given the stream while it is not on
+             * screen: the SDK opens the camera before it shows the preview (reproduced
+             * without the SDK: attach while display:none, then show), and keeps the feed
+             * running under the frozen capture and the review screen. On the same page,
+             * the same stream on a new element attached while the preview was showing
+             * was drawn correctly every time. So a new display element is attached when
+             * the stream starts with the preview showing, when the preview is shown, and
+             * whenever the SDK reveals the live feed again (refreshDisplay()).
              * The display element is native video compositing, as before -- no per-frame
              * script and no canvas -- so it costs no more than the old preview.
              */

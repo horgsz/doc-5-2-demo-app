@@ -16,10 +16,14 @@ import { Component, Method, Prop, Watch, h } from '@stencil/core';
  * then rotated -- while its box, object-fit and videoWidth/videoHeight are all
  * correct. Once stuck, that element stays stuck: re-attaching the stream does
  * not fix it, and it carries over to the back of the card and to retakes.
- * The SDK attaches the stream before it shows the preview, which is the
- * pattern that triggers it (reproduced without the SDK: attach while
- * display:none, then show). On the same page, the same stream on a new
- * element attached while visible was drawn correctly every time.
+ * It happens to an element that is given the stream while it is not on
+ * screen: the SDK opens the camera before it shows the preview (reproduced
+ * without the SDK: attach while display:none, then show), and keeps the feed
+ * running under the frozen capture and the review screen. On the same page,
+ * the same stream on a new element attached while the preview was showing
+ * was drawn correctly every time. So a new display element is attached when
+ * the stream starts with the preview showing, when the preview is shown, and
+ * whenever the SDK reveals the live feed again (refreshDisplay()).
  *
  * The display element is native video compositing, as before -- no per-frame
  * script and no canvas -- so it costs no more than the old preview.
@@ -78,24 +82,37 @@ export class IDVerseVideo {
   }
 
   /**
-   * Makes sure a display element is showing the sink's current stream, if the
-   * preview is visible and the sink is playing one.
+   * Attaches a new display element. Call once the live feed is uncovered
+   * again (after the screen has updated), e.g. when a frozen capture is
+   * dropped for a retake; the current one stays until the new one has a frame.
    */
-  private syncDisplay() {
+  @Method()
+  async refreshDisplay() {
+    this.syncDisplay(true);
+  }
+
+  /**
+   * Makes sure a display element is showing the sink's current stream, if the
+   * preview is visible and the sink is playing one. With `replace`, a new
+   * element is swapped in even if the current one already shows the stream;
+   * the old one stays on screen until the new one has a frame, so there is no
+   * black flash.
+   */
+  private syncDisplay(replace: boolean = false) {
     const sink = this.videoRef;
     const stream = sink?.srcObject as MediaStream | null;
     if (!this.visible || !this.hostRef || !stream || sink.paused) {
       return;
     }
 
-    if (this.display && this.display.srcObject === stream) {
-      if (this.display.paused) {
-        void this.display.play().catch(() => undefined);
+    const current = this.display;
+    if (current && current.srcObject === stream && !replace) {
+      if (current.paused) {
+        void current.play().catch(() => undefined);
       }
       return;
     }
 
-    this.removeDisplay();
     const display = document.createElement('video');
     display.className = 'idv-video-display';
     display.muted = true;
@@ -104,18 +121,30 @@ export class IDVerseVideo {
     display.setAttribute('aria-hidden', 'true');
     this.display = display;
     this.syncStyle();
+    // After the current one in the DOM, so it paints on top once it has a frame.
     this.hostRef.appendChild(display);
+
+    if (current) {
+      const retire = () => {
+        current.srcObject = null;
+        current.remove();
+      };
+      display.addEventListener('playing', retire, { once: true });
+      // Removed or replaced again before it ever played.
+      display.addEventListener('emptied', retire, { once: true });
+    }
+
     display.srcObject = stream;
     void display.play().catch(() => undefined);
   }
 
   private removeDisplay() {
-    if (!this.display) {
-      return;
-    }
-    this.display.srcObject = null;
-    this.display.remove();
     this.display = null;
+    // Including any older one still waiting to be retired.
+    this.hostRef?.querySelectorAll('video.idv-video-display').forEach(el => {
+      (el as HTMLVideoElement).srcObject = null;
+      el.remove();
+    });
   }
 
   /**

@@ -375,6 +375,37 @@ export class IDVerseIDScan {
   @State() captureSteadying: boolean = false;
   /** The captured frame is held on the canvas overlay. */
   @State() captureFrozen: boolean = false;
+
+  /**
+   * Whether the live feed was uncovered at the last render. On the render
+   * where it becomes uncovered -- a frozen capture, the flip animation, the
+   * review / result / success screens or the intro going away --
+   * componentDidRender has idv-video attach a new display element. See
+   * idv-video.tsx: on iOS, an element that got the stream while covered can
+   * stay drawn shrunk.
+   */
+  private liveFeedWasUncovered: boolean = false;
+
+  private get liveFeedUncovered(): boolean {
+    return (
+      this.showVideo &&
+      !this.openingCamera &&
+      !this.captureFrozen &&
+      !this.flipDocument &&
+      !this.showCaptureIssues &&
+      !this.showCaptureResult &&
+      !this.showSuccessAnimation
+    );
+  }
+
+  componentDidRender() {
+    const uncovered = this.liveFeedUncovered;
+    if (uncovered && !this.liveFeedWasUncovered) {
+      void this.idvVideo?.refreshDisplay?.();
+    }
+    this.liveFeedWasUncovered = uncovered;
+  }
+
   /** Overlay that holds the captured frame while the stream runs underneath. */
   private freezeCanvas: HTMLCanvasElement | null = null;
   /** At least one frame has been captured and rejected. */
