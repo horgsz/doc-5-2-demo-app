@@ -41,6 +41,12 @@
     height: 100%;
     object-fit: cover;
   }
+
+  // The SDK's element: receives the stream and is read from, but not shown
+  // (see idv-video.tsx). Hidden, not display:none, so it keeps its box.
+  video.idv-video-sink {
+    visibility: hidden;
+  }
 }
 
 // Desktop embed only -- the height requirement keeps this off landscape

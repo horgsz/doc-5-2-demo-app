@@ -549,6 +549,26 @@ export namespace Components {
     }
     interface IdvTryAgainIcon {
     }
+    /**
+     * The camera preview.
+     * Two <video> elements play the same MediaStream:
+     * - The "sink" (`getVideoRef()`): the element the SDK binds the camera to,
+     *   reads frames from, styles and pauses. It is kept in layout but hidden.
+     * - The "display": what the user sees. A new one is created for each stream,
+     *   and only once the preview is actually rendered.
+     * Why: iOS WebKit (seen on iPhone 15, iOS Safari 27.2) can get a <video>
+     * element's video layer stuck drawing a camera stream shrunk in the middle of
+     * the screen -- the portrait frame fitted at its unrotated landscape size,
+     * then rotated -- while its box, object-fit and videoWidth/videoHeight are all
+     * correct. Once stuck, that element stays stuck: re-attaching the stream does
+     * not fix it, and it carries over to the back of the card and to retakes.
+     * The SDK attaches the stream before it shows the preview, which is the
+     * pattern that triggers it (reproduced without the SDK: attach while
+     * display:none, then show). On the same page, the same stream on a new
+     * element attached while visible was drawn correctly every time.
+     * The display element is native video compositing, as before -- no per-frame
+     * script and no canvas -- so it costs no more than the old preview.
+     */
     interface IdvVideo {
         "getVideoRef": () => Promise<HTMLVideoElement>;
         "visible": boolean;
@@ -969,6 +989,26 @@ declare global {
         prototype: HTMLIdvTryAgainIconElement;
         new (): HTMLIdvTryAgainIconElement;
     };
+    /**
+     * The camera preview.
+     * Two <video> elements play the same MediaStream:
+     * - The "sink" (`getVideoRef()`): the element the SDK binds the camera to,
+     *   reads frames from, styles and pauses. It is kept in layout but hidden.
+     * - The "display": what the user sees. A new one is created for each stream,
+     *   and only once the preview is actually rendered.
+     * Why: iOS WebKit (seen on iPhone 15, iOS Safari 27.2) can get a <video>
+     * element's video layer stuck drawing a camera stream shrunk in the middle of
+     * the screen -- the portrait frame fitted at its unrotated landscape size,
+     * then rotated -- while its box, object-fit and videoWidth/videoHeight are all
+     * correct. Once stuck, that element stays stuck: re-attaching the stream does
+     * not fix it, and it carries over to the back of the card and to retakes.
+     * The SDK attaches the stream before it shows the preview, which is the
+     * pattern that triggers it (reproduced without the SDK: attach while
+     * display:none, then show). On the same page, the same stream on a new
+     * element attached while visible was drawn correctly every time.
+     * The display element is native video compositing, as before -- no per-frame
+     * script and no canvas -- so it costs no more than the old preview.
+     */
     interface HTMLIdvVideoElement extends Components.IdvVideo, HTMLStencilElement {
     }
     var HTMLIdvVideoElement: {
@@ -1526,6 +1566,26 @@ declare namespace LocalJSX {
     }
     interface IdvTryAgainIcon {
     }
+    /**
+     * The camera preview.
+     * Two <video> elements play the same MediaStream:
+     * - The "sink" (`getVideoRef()`): the element the SDK binds the camera to,
+     *   reads frames from, styles and pauses. It is kept in layout but hidden.
+     * - The "display": what the user sees. A new one is created for each stream,
+     *   and only once the preview is actually rendered.
+     * Why: iOS WebKit (seen on iPhone 15, iOS Safari 27.2) can get a <video>
+     * element's video layer stuck drawing a camera stream shrunk in the middle of
+     * the screen -- the portrait frame fitted at its unrotated landscape size,
+     * then rotated -- while its box, object-fit and videoWidth/videoHeight are all
+     * correct. Once stuck, that element stays stuck: re-attaching the stream does
+     * not fix it, and it carries over to the back of the card and to retakes.
+     * The SDK attaches the stream before it shows the preview, which is the
+     * pattern that triggers it (reproduced without the SDK: attach while
+     * display:none, then show). On the same page, the same stream on a new
+     * element attached while visible was drawn correctly every time.
+     * The display element is native video compositing, as before -- no per-frame
+     * script and no canvas -- so it costs no more than the old preview.
+     */
     interface IdvVideo {
         "visible"?: boolean;
     }
@@ -1637,6 +1697,26 @@ declare module "@stencil/core" {
             "idv-modal": LocalJSX.IdvModal & JSXBase.HTMLAttributes<HTMLIdvModalElement>;
             "idv-sdk-web": LocalJSX.IdvSdkWeb & JSXBase.HTMLAttributes<HTMLIdvSdkWebElement>;
             "idv-try-again-icon": LocalJSX.IdvTryAgainIcon & JSXBase.HTMLAttributes<HTMLIdvTryAgainIconElement>;
+            /**
+             * The camera preview.
+             * Two <video> elements play the same MediaStream:
+             * - The "sink" (`getVideoRef()`): the element the SDK binds the camera to,
+             *   reads frames from, styles and pauses. It is kept in layout but hidden.
+             * - The "display": what the user sees. A new one is created for each stream,
+             *   and only once the preview is actually rendered.
+             * Why: iOS WebKit (seen on iPhone 15, iOS Safari 27.2) can get a <video>
+             * element's video layer stuck drawing a camera stream shrunk in the middle of
+             * the screen -- the portrait frame fitted at its unrotated landscape size,
+             * then rotated -- while its box, object-fit and videoWidth/videoHeight are all
+             * correct. Once stuck, that element stays stuck: re-attaching the stream does
+             * not fix it, and it carries over to the back of the card and to retakes.
+             * The SDK attaches the stream before it shows the preview, which is the
+             * pattern that triggers it (reproduced without the SDK: attach while
+             * display:none, then show). On the same page, the same stream on a new
+             * element attached while visible was drawn correctly every time.
+             * The display element is native video compositing, as before -- no per-frame
+             * script and no canvas -- so it costs no more than the old preview.
+             */
             "idv-video": LocalJSX.IdvVideo & JSXBase.HTMLAttributes<HTMLIdvVideoElement>;
             "idv-warning-outline-icon": LocalJSX.IdvWarningOutlineIcon & JSXBase.HTMLAttributes<HTMLIdvWarningOutlineIconElement>;
             "tips-tabs": LocalJSX.TipsTabs & JSXBase.HTMLAttributes<HTMLTipsTabsElement>;
