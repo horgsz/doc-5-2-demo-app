@@ -2,28 +2,66 @@
 
 Baseline commit: the package as received (`web-sdk` = upstream `92b8ef5` + `web-sdk-changes-since-92b8ef5.patch`).
 
-To share with the dev, send the files in `changes/`:
-- `changes/web-sdk-fixes.patch`: only the `web-sdk/` source changes, paths relative to `engines/web-sdk`.
-  In their clone (with the original patch already applied): `cd engines/web-sdk && git apply /path/to/web-sdk-fixes.patch`
-- `changes/*.patch` (numbered): one `git format-patch` file per commit, for `git am` if they prefer.
+## What to send the developer (`changes/`)
+- `web-sdk-fixes.patch`: the final SDK change only. Paths are relative to `engines/web-sdk`. In their clone, with the original patch already applied:
+  `cd engines/web-sdk && git apply --check /path/to/web-sdk-fixes.patch && git apply /path/to/web-sdk-fixes.patch`
+- `CHANGES.md`: this file.
+- `repro.html`: a standalone test page that shows the WebKit bug without the SDK. Use it for a WebKit bug report. It needs `getUserMedia`, so it must be served over HTTPS; the `/__log` and `/__cmd` calls in it are harmless if the server doesn't have those routes.
 
 Regenerate after new commits: `./export-changes.sh`
 
-## Log
+## 1. iPhone camera preview drawn shrunk in the middle of the screen
 
-### 1. iPhone camera preview drawn shrunk in the middle of the screen (FIXED)
-- **Symptom:** On iPhone 15 (iOS Safari, and the Slack in-app browser) the ID-capture preview is drawn as a small box (about 221x393 pt) in the middle of the screen and never recovers.
-- **Diagnosis (measured on the device):**
-  - The host and the `<video>` are both full-viewport (393x695), with `object-fit: cover` and no transform, clip or mask.
-  - The rendered size matches a 9:16 portrait frame contain-fitted at its unrotated landscape size and then rotated. WebKit is drawing the video wrong; the CSS layout is correct.
-  - Not resolution-related: it happens at both 4K and 1080p. An earlier attempt that changed the iOS preview resolution was reverted.
-  - WebKit only redraws the video when the element's box changes. The update pinned the `<video>` with `position:absolute; inset:0`, so its box never changes. Before the update, a late `resize` made the box change and "snapped" the preview to full screen.
-  - Live tests on the device:
-    - Holding a style change (`object-fit` or a 1px height change) for 600 ms fixes it.
-    - Undoing the change within 2 frames, or after 100 ms, does not.
-- **Fix:** `ui/components/shared/idv-video/idv-video.tsx`: shrinks the `<video>` height by 1px for 700 ms on `loadedmetadata`, `resize` and `playing`, again 1 s after each, and when the preview is shown. Each run posts a `[perf] video: relayout (...)` line.
-- **Verified:** iPhone 15, iOS Safari. The preview fills the screen from the start, and through capture and the flip to the back.
-- **Note (not fixed):** `detectIphoneModel()` reports iPhone 15 as gen 14, because they have the same screen size. It makes no difference to the tier.
+**Status:** fixed by drawing the preview on a canvas. Tested once on iPhone 15 (iOS Safari 27.2): full screen for the front, the back, a bad capture with a retake, and Try again. **Open issue:** the preview felt a bit laggy (see "Performance").
 
-## Test harness only (app/, not the SDK)
-- `app/server.js` + `app/www/index.html`: the `[perf]` lines and DOM probes are relayed to the server console (`POST /__log`), and there is a remote console (`/__cmd`) for running experiments on the device. Don't ship these.
+### Symptom
+On iPhone 15 (iOS Safari, and the Slack in-app browser) the ID-capture preview is drawn as a small box, about 221x393 pt, in the middle of the screen. It happens when the camera opens for the front, when it opens for the back, and after a retake, and it usually never corrects itself.
+
+### Diagnosis (measured on the device)
+- The layout is correct. The host and the `<video>` are both full-viewport (393x695), with `object-fit: cover`, and there's no transform, clip or mask on them or their parents. `videoWidth` and `videoHeight` are correct (2160x3840).
+- The size drawn matches the 9:16 portrait frame fitted inside the screen at its unrotated landscape size (3840x2160) and then rotated. WebKit's video layer is drawing it wrong.
+- **It reproduces without the SDK** (`repro.html`): a plain `getUserMedia` stream on a full-screen `<video>`.
+  - Opened on a visible element, it is drawn small for a moment, then usually corrects itself.
+  - Attached while the element isn't rendered (`display:none` or `visibility:hidden`) and shown afterwards, it often stays small. The same step gave different results on different runs, so it's a race inside WebKit.
+- **Not related to resolution:** it happens at both 4K and 1080p.
+- **Why the SDK update made it worse:**
+  - The SDK attaches the stream before it shows the video (`startScanning`: `createScanner`, then `showVideo`).
+  - The update pinned the `<video>` with `position:absolute; inset:0`. Before that, a late `resize` changed the element's box, which made WebKit redraw it and "snapped" the preview to full screen.
+
+### Approaches tried and rejected (all reverted)
+1. 1080p preview on high-tier iPhones: no effect.
+2. Shrinking the `<video>` by 1px for 700 ms after stream events: worked on first open but not on the back or retake paths. It also depends on timing tuned on one phone, and the page can't detect the bad state, so it can't confirm the fix worked.
+3. Hiding the video with `opacity: 0` instead of `display: none`, so it stays rendered: still small in the SDK.
+
+### Fix
+In `src/ui/components/shared/idv-video/` (`idv-video.tsx`, `idv-video.scss`), the preview the user sees is now a `<canvas>`.
+- The component draws each camera frame onto the canvas, cropped the same way as `object-fit: cover`.
+  - It uses `requestVideoFrameCallback`, which paints once per camera frame. Browsers without it fall back to `requestAnimationFrame`.
+  - The canvas is sized to its box at device pixels, using a `ResizeObserver`.
+- The `<video>` still receives the stream, and the SDK still reads frames from it, records it, and styles it. It is `visibility: hidden` (not `display: none`, so it keeps its box), and its inline `opacity`, `transition` and `transform` are copied onto the canvas. This keeps the fade-in and webcam mirroring working.
+- Painting starts on `playing` and when `visible` becomes true, and stops when the preview is hidden or removed. The canvas is cleared on `emptied`, so a new scan doesn't open on the previous scan's last frame.
+- No other SDK code changes. `getVideoRef()` still returns the `<video>`.
+- It posts `[perf] preview: ... fps, draw ... ms` lines on the Debug UI channel.
+- `src/components.d.ts` was regenerated by Stencil (doc comment only).
+
+### Performance (to do before release)
+- On iPhone 15 the paint rate was 20–29 fps, with drawing taking 5–14 ms per frame on the main thread (4K source drawn into a 1179x2085 canvas). The preview felt a bit laggy, especially during capture.
+- Options:
+  - draw at 2x instead of 3x device pixels (a benchmark measured 29.6 vs 27.5 fps);
+  - skip painting while the frozen-capture overlay is showing;
+  - lower the preview stream resolution and raise it only for each capture (`Scanner.dynamicCapture` already supports this).
+- WebGL was slower (16.6 fps).
+
+### Tests
+- `npx stencil test --spec -- src/ui/components/id-scan` passes (89/89). No unit tests cover painting, so it needs testing on devices.
+- Not yet tested on other iPhones, in the Slack in-app browser, on Android, on desktop, in landscape, or in face scan (which also uses `idv-video`, hidden).
+
+### Note (not fixed)
+`detectIphoneModel()` reports iPhone 15 as gen 14, because they have the same screen size. It makes no difference to the tier.
+
+## Test harness only (`app/`, not the SDK; don't ship)
+- `app/server.js` and `app/www/index.html`:
+  - The `[perf]` lines and DOM probes are sent to the server console (`POST /__log`).
+  - A remote console (`/__cmd`) runs experiments on the device.
+  - The ancestors of the `<video>` are logged when a stream is attached.
+- `app/www/repro.html`: the test page without the SDK.
