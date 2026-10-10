@@ -549,6 +549,27 @@ export namespace Components {
     }
     interface IdvTryAgainIcon {
     }
+    /**
+     * The camera preview.
+     * The <video> element is the stream's sink -- the SDK attaches the camera to
+     * it, reads frames from it, records it -- but it is not what the user sees.
+     * The picture on screen is a <canvas> that this component paints from the
+     * video, frame by frame, with its own cover crop.
+     * Why not show the <video>: iOS WebKit (seen on iPhone 15, iOS Safari 27.2)
+     * can composite a camera stream wrong -- the portrait frame contain-fitted at
+     * its unrotated landscape size and rotated, a small box mid-screen that never
+     * recovers -- while the element's box, `object-fit` and `videoWidth` are all
+     * correct. It is a race inside WebKit's video layer, reproduced without the
+     * SDK: a plain stream opens small and usually corrects itself, a stream
+     * attached while the element is not rendered stays small, and the SDK's busy
+     * camera open lost it most of the time. Nothing the page can observe or
+     * style reliably fixes it. Painting the frames ourselves takes the video
+     * layer out of the picture on every browser.
+     * The <video> keeps its box (visibility: hidden, not display: none) and stays
+     * the place the SDK styles the feed: its inline opacity / transition (the
+     * fade-in in id-scan) and transform (webcam mirroring, Camera.ts) are copied
+     * onto the canvas.
+     */
     interface IdvVideo {
         "getVideoRef": () => Promise<HTMLVideoElement>;
         "visible": boolean;
@@ -969,6 +990,27 @@ declare global {
         prototype: HTMLIdvTryAgainIconElement;
         new (): HTMLIdvTryAgainIconElement;
     };
+    /**
+     * The camera preview.
+     * The <video> element is the stream's sink -- the SDK attaches the camera to
+     * it, reads frames from it, records it -- but it is not what the user sees.
+     * The picture on screen is a <canvas> that this component paints from the
+     * video, frame by frame, with its own cover crop.
+     * Why not show the <video>: iOS WebKit (seen on iPhone 15, iOS Safari 27.2)
+     * can composite a camera stream wrong -- the portrait frame contain-fitted at
+     * its unrotated landscape size and rotated, a small box mid-screen that never
+     * recovers -- while the element's box, `object-fit` and `videoWidth` are all
+     * correct. It is a race inside WebKit's video layer, reproduced without the
+     * SDK: a plain stream opens small and usually corrects itself, a stream
+     * attached while the element is not rendered stays small, and the SDK's busy
+     * camera open lost it most of the time. Nothing the page can observe or
+     * style reliably fixes it. Painting the frames ourselves takes the video
+     * layer out of the picture on every browser.
+     * The <video> keeps its box (visibility: hidden, not display: none) and stays
+     * the place the SDK styles the feed: its inline opacity / transition (the
+     * fade-in in id-scan) and transform (webcam mirroring, Camera.ts) are copied
+     * onto the canvas.
+     */
     interface HTMLIdvVideoElement extends Components.IdvVideo, HTMLStencilElement {
     }
     var HTMLIdvVideoElement: {
@@ -1526,6 +1568,27 @@ declare namespace LocalJSX {
     }
     interface IdvTryAgainIcon {
     }
+    /**
+     * The camera preview.
+     * The <video> element is the stream's sink -- the SDK attaches the camera to
+     * it, reads frames from it, records it -- but it is not what the user sees.
+     * The picture on screen is a <canvas> that this component paints from the
+     * video, frame by frame, with its own cover crop.
+     * Why not show the <video>: iOS WebKit (seen on iPhone 15, iOS Safari 27.2)
+     * can composite a camera stream wrong -- the portrait frame contain-fitted at
+     * its unrotated landscape size and rotated, a small box mid-screen that never
+     * recovers -- while the element's box, `object-fit` and `videoWidth` are all
+     * correct. It is a race inside WebKit's video layer, reproduced without the
+     * SDK: a plain stream opens small and usually corrects itself, a stream
+     * attached while the element is not rendered stays small, and the SDK's busy
+     * camera open lost it most of the time. Nothing the page can observe or
+     * style reliably fixes it. Painting the frames ourselves takes the video
+     * layer out of the picture on every browser.
+     * The <video> keeps its box (visibility: hidden, not display: none) and stays
+     * the place the SDK styles the feed: its inline opacity / transition (the
+     * fade-in in id-scan) and transform (webcam mirroring, Camera.ts) are copied
+     * onto the canvas.
+     */
     interface IdvVideo {
         "visible"?: boolean;
     }
@@ -1637,6 +1700,27 @@ declare module "@stencil/core" {
             "idv-modal": LocalJSX.IdvModal & JSXBase.HTMLAttributes<HTMLIdvModalElement>;
             "idv-sdk-web": LocalJSX.IdvSdkWeb & JSXBase.HTMLAttributes<HTMLIdvSdkWebElement>;
             "idv-try-again-icon": LocalJSX.IdvTryAgainIcon & JSXBase.HTMLAttributes<HTMLIdvTryAgainIconElement>;
+            /**
+             * The camera preview.
+             * The <video> element is the stream's sink -- the SDK attaches the camera to
+             * it, reads frames from it, records it -- but it is not what the user sees.
+             * The picture on screen is a <canvas> that this component paints from the
+             * video, frame by frame, with its own cover crop.
+             * Why not show the <video>: iOS WebKit (seen on iPhone 15, iOS Safari 27.2)
+             * can composite a camera stream wrong -- the portrait frame contain-fitted at
+             * its unrotated landscape size and rotated, a small box mid-screen that never
+             * recovers -- while the element's box, `object-fit` and `videoWidth` are all
+             * correct. It is a race inside WebKit's video layer, reproduced without the
+             * SDK: a plain stream opens small and usually corrects itself, a stream
+             * attached while the element is not rendered stays small, and the SDK's busy
+             * camera open lost it most of the time. Nothing the page can observe or
+             * style reliably fixes it. Painting the frames ourselves takes the video
+             * layer out of the picture on every browser.
+             * The <video> keeps its box (visibility: hidden, not display: none) and stays
+             * the place the SDK styles the feed: its inline opacity / transition (the
+             * fade-in in id-scan) and transform (webcam mirroring, Camera.ts) are copied
+             * onto the canvas.
+             */
             "idv-video": LocalJSX.IdvVideo & JSXBase.HTMLAttributes<HTMLIdvVideoElement>;
             "idv-warning-outline-icon": LocalJSX.IdvWarningOutlineIcon & JSXBase.HTMLAttributes<HTMLIdvWarningOutlineIconElement>;
             "tips-tabs": LocalJSX.TipsTabs & JSXBase.HTMLAttributes<HTMLTipsTabsElement>;

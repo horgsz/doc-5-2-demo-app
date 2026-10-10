@@ -40,6 +40,21 @@
     width: 100%;
     height: 100%;
     object-fit: cover;
+    // The stream's sink, not its display: the canvas below paints the frames
+    // (see idv-video.tsx for why). Hidden but kept in layout -- not
+    // display: none -- so it keeps a box and the SDK's reads of it still hold.
+    visibility: hidden;
+  }
+
+  // What the user sees. Its backing store is sized to this box at device
+  // pixels and the frame is cover-cropped onto it when painted, so no
+  // object-fit is needed here.
+  canvas.idv-video-preview {
+    display: block;
+    position: absolute;
+    inset: 0;
+    width: 100%;
+    height: 100%;
   }
 }
 
