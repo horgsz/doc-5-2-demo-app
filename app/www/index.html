@@ -449,6 +449,29 @@
           });
         } catch (e) { relay('[attach] hook failed ' + e); }
         window.__idvWalk = function () { return walk(document, []); };
+        // Frame-level log around track enable/disable (diagnostics).
+        try { (function(){
+  if (window.__frameLog) return 'already on';
+  window.__frameLog = true;
+  var last = '';
+  function hook(v){
+    if (v.__hooked) return; v.__hooked = true;
+    var tag = /sink/.test(v.className) ? 'sink' : 'display';
+    v.addEventListener('idvtrackenabled', function(){ relay('[frames] '+tag+' got idvtrackenabled'); });
+    function f(now, m){
+      var t = v.srcObject && v.srcObject.getVideoTracks()[0];
+      var k = m.width+'x'+m.height+' en='+(t&&t.enabled)+' vwh='+v.videoWidth+'x'+v.videoHeight;
+      if (k !== v.__last){ relay('[frames] '+tag+' #'+m.presentedFrames+' '+k); v.__last = k; }
+      if (v.isConnected) v.requestVideoFrameCallback(f);
+    }
+    v.requestVideoFrameCallback(f);
+  }
+  setInterval(function(){ __idvWalk().filter(function(e){return e.tagName==='VIDEO';}).forEach(hook); }, 300);
+  var en = Object.getOwnPropertyDescriptor(MediaStreamTrack.prototype, 'enabled');
+  Object.defineProperty(MediaStreamTrack.prototype, 'enabled', { configurable: true, get: en.get,
+    set: function(x){ relay('[frames] track.enabled = '+x); en.set.call(this, x); } });
+  return 'frame logging on';
+})(); } catch (e) { relay('[frames] hook failed ' + e); }
         setInterval(function () {
           fetch('/__cmd', { cache: 'no-store' }).then(function (r) { return r.json(); }).then(function (j) {
             if (!j.code) return;
