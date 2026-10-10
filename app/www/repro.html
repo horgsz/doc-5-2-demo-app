@@ -95,17 +95,58 @@
     },
   };
 
+  // Bisect the SDK's camera open (Camera.getMediaDevices / chooseCamera /
+  // bindStreamToVideoFeed) against a plain open. Every step stops the previous
+  // stream and opens a new one on the visible, full-screen video.
+  async function stopAll() {
+    if (stream) stream.getTracks().forEach(function (t) { t.stop(); });
+    v.srcObject = null; stream = null;
+    host.classList.remove('hidden'); v.style.opacity = ''; v.style.transition = '';
+    await sleep(800);
+  }
+  async function probe() {
+    // SDK: getUserMedia({video:true}) for capabilities, then stop it straight away.
+    var s0 = await navigator.mediaDevices.getUserMedia({ video: true, audio: false });
+    var t0 = s0.getVideoTracks()[0]; var st = t0.getSettings();
+    relay('probe stream ' + st.width + 'x' + st.height + ' facing=' + st.facingMode + ' label=' + t0.label);
+    s0.getTracks().forEach(function (t) { t.stop(); });
+  }
+  async function backDeviceId() {
+    var devs = (await navigator.mediaDevices.enumerateDevices()).filter(function (d) { return d.kind === 'videoinput'; });
+    relay('cameras: ' + devs.map(function (d) { return d.label; }).join(' | '));
+    var back = devs.filter(function (d) { return /back|rear/i.test(d.label); });
+    back.sort(function (x, y) { return x.label.localeCompare(y.label); });
+    relay('SDK-style pick: ' + (back[0] && back[0].label));
+    return back[0] && back[0].deviceId;
+  }
+  async function openWith(useProbe, useDeviceId) {
+    await stopAll();
+    if (useProbe) await probe();
+    var video = { width: 3840 };
+    if (useDeviceId) { video = { deviceId: { exact: await backDeviceId() }, width: 3840 }; }
+    else video.facingMode = { ideal: 'environment' };
+    stream = await navigator.mediaDevices.getUserMedia({ audio: false, video: video });
+    v.srcObject = stream; await v.play();
+  }
+  var bisect = {
+    P0: function () { return openWith(false, false); },
+    P1: function () { return openWith(true, false); },
+    P2: function () { return openWith(false, true); },
+    P3: function () { return openWith(true, true); },
+  };
+
   async function run() {
     relay('UA ' + navigator.userAgent);
-    var order = [['1 H opacity:0', 'H'], ['2 H opacity:0', 'H'], ['3 B display:none', 'B'],
-                 ['4 H opacity:0', 'H'], ['5 H opacity:0', 'H'], ['6 B display:none', 'B']];
+    var order = [['1 plain', 'P0'], ['2 probe', 'P1'], ['3 deviceId', 'P2'], ['4 probe+deviceId', 'P3'],
+                 ['5 plain', 'P0'], ['6 probe', 'P1'], ['7 deviceId', 'P2'], ['8 probe+deviceId', 'P3']];
     for (var i = 0; i < order.length; i++) {
-      if (i > 0) { label('reset…'); await reset(); }
+      label(order[i][0] + ' …');
+      try { await bisect[order[i][1]](); } catch (e) { relay('ERR ' + order[i][1] + ' ' + e); label(order[i][0] + ' ERR'); }
       label(order[i][0]);
-      try { await steps[order[i][1]](); } catch (e) { relay('ERR ' + order[i][1] + ' ' + e); label(order[i][0] + ' ERR'); }
       await sleep(1000); geo(order[i][0] + ' +1s');
-      await sleep(5000); geo(order[i][0] + ' +6s');
+      await sleep(4000); geo(order[i][0] + ' +5s');
     }
+    await stopAll();
     label('DONE');
   }
 
