@@ -1,62 +1,73 @@
 # Changes to the doc-5-2 demo / web-sdk
 
-Baseline commit: the package as received (`web-sdk` = upstream `92b8ef5` + `web-sdk-changes-since-92b8ef5.patch`).
+Baseline: the package as received (`web-sdk` = upstream `92b8ef5` + `web-sdk-changes-since-92b8ef5.patch`).
 
 ## What to send the developer (`changes/`)
-- `web-sdk-fixes.patch`: the final SDK change only. Paths are relative to `engines/web-sdk`. In their clone, with the original patch already applied:
-  `cd engines/web-sdk && git apply --check /path/to/web-sdk-fixes.patch && git apply /path/to/web-sdk-fixes.patch`
-- `CHANGES.md`: this file.
-- `repro.html`: a standalone test page that shows the WebKit bug without the SDK. Use it for a WebKit bug report. It needs `getUserMedia`, so it must be served over HTTPS; the `/__log` and `/__cmd` calls in it are harmless if the server doesn't have those routes.
 
-Regenerate after new commits: `./export-changes.sh`
+| File | Use it when |
+|---|---|
+| `web-sdk-fixes.patch` | **The fix.** Against the original source, with no earlier fix from me applied. |
+| `from-delay-fix.patch` | They already applied my first fix, the "1px / 700 ms relayout" delay. This undoes it and applies the final fix. |
+| `from-canvas-fix.patch` | They already applied my second fix, the canvas-drawn preview. This undoes it and applies the final fix. |
+| `CHANGES.md` | This file. |
+| `repro.html` | A test page that shows the WebKit bug without the SDK. Use it for a WebKit bug report. |
+
+All patches use paths relative to `engines/web-sdk`. To apply one:
+`cd engines/web-sdk && git apply --check X.patch && git apply X.patch`
+
+To regenerate them: `./export-changes.sh`
 
 ## 1. iPhone camera preview drawn shrunk in the middle of the screen
 
-**Status:** fixed by drawing the preview on a canvas. Tested once on iPhone 15 (iOS Safari 27.2): full screen for the front, the back, a bad capture with a retake, and Try again. **Open issue:** the preview felt a bit laggy (see "Performance").
+**Status:** fixed. Tested on iPhone 15, iOS Safari 27.2: full screen for the front, the back, a bad capture with a retake, and Try again. The preview is smooth and recognition is normal.
 
 ### Symptom
-On iPhone 15 (iOS Safari, and the Slack in-app browser) the ID-capture preview is drawn as a small box, about 221x393 pt, in the middle of the screen. It happens when the camera opens for the front, when it opens for the back, and after a retake, and it usually never corrects itself.
+On iPhone 15 (iOS Safari and the Slack in-app browser) the ID-capture preview is drawn as a small box, about 221x393 pt, in the middle of the screen. It happens on the front, the back and after retakes, and never corrects itself.
 
-### Diagnosis (measured on the device)
-- The layout is correct. The host and the `<video>` are both full-viewport (393x695), with `object-fit: cover`, and there's no transform, clip or mask on them or their parents. `videoWidth` and `videoHeight` are correct (2160x3840).
-- The size drawn matches the 9:16 portrait frame fitted inside the screen at its unrotated landscape size (3840x2160) and then rotated. WebKit's video layer is drawing it wrong.
-- **It reproduces without the SDK** (`repro.html`): a plain `getUserMedia` stream on a full-screen `<video>`.
-  - Opened on a visible element, it is drawn small for a moment, then usually corrects itself.
-  - Attached while the element isn't rendered (`display:none` or `visibility:hidden`) and shown afterwards, it often stays small. The same step gave different results on different runs, so it's a race inside WebKit.
-- **Not related to resolution:** it happens at both 4K and 1080p.
-- **Why the SDK update made it worse:**
-  - The SDK attaches the stream before it shows the video (`startScanning`: `createScanner`, then `showVideo`).
-  - The update pinned the `<video>` with `position:absolute; inset:0`. Before that, a late `resize` changed the element's box, which made WebKit redraw it and "snapped" the preview to full screen.
+### Cause
+iOS WebKit can get a `<video>` element's video layer stuck drawing a camera stream wrong: the portrait frame fitted at its unrotated landscape size, then rotated.
+- The element's box, `object-fit` and `videoWidth`/`videoHeight` are all correct throughout, so the page can't detect the bad state.
+- Once an element is stuck it stays stuck. Re-attaching the stream (`srcObject = null; srcObject = stream`) doesn't fix it. Because the SDK keeps the same element for the front, the back and retakes, all three were affected.
+- Trigger: the stream is attached while the element isn't rendered, and the element is shown afterwards. This is what the SDK does: `startScanning` opens the camera (`createScanner`) and only then sets `showVideo`. It reproduces without the SDK (`repro.html`).
+- The update made it visible. It pinned the `<video>` with `position:absolute; inset:0`. Before that, a late `resize` changed the element's box, which made WebKit redraw the layer and snap the preview back to full screen.
 
-### Approaches tried and rejected (all reverted)
-1. 1080p preview on high-tier iPhones: no effect.
-2. Shrinking the `<video>` by 1px for 700 ms after stream events: worked on first open but not on the back or retake paths. It also depends on timing tuned on one phone, and the page can't detect the bad state, so it can't confirm the fix worked.
-3. Hiding the video with `opacity: 0` instead of `display: none`, so it stays rendered: still small in the SDK.
+How this was established, live on the device:
+- The same stream on a **new** `<video>`, attached while visible, drew full screen. That held both on the page and inside the SDK's own preview container, while the SDK's element next to it stayed small.
+- Things that were **not** the cause, each tested:
+  - camera resolution (4K or 1080p);
+  - how the camera is opened (capabilities probe stream, `deviceId`);
+  - the blur on the feedback pill;
+  - the frame backdrop;
+  - frame reads by the placement and guide-shape checks;
+  - session recording.
 
 ### Fix
-In `src/ui/components/shared/idv-video/` (`idv-video.tsx`, `idv-video.scss`), the preview the user sees is now a `<canvas>`.
-- The component draws each camera frame onto the canvas, cropped the same way as `object-fit: cover`.
-  - It uses `requestVideoFrameCallback`, which paints once per camera frame. Browsers without it fall back to `requestAnimationFrame`.
-  - The canvas is sized to its box at device pixels, using a `ResizeObserver`.
-- The `<video>` still receives the stream, and the SDK still reads frames from it, records it, and styles it. It is `visibility: hidden` (not `display: none`, so it keeps its box), and its inline `opacity`, `transition` and `transform` are copied onto the canvas. This keeps the fade-in and webcam mirroring working.
-- Painting starts on `playing` and when `visible` becomes true, and stops when the preview is hidden or removed. The canvas is cleared on `emptied`, so a new scan doesn't open on the previous scan's last frame.
-- No other SDK code changes. `getVideoRef()` still returns the `<video>`.
-- It posts `[perf] preview: ... fps, draw ... ms` lines on the Debug UI channel.
-- `src/components.d.ts` was regenerated by Stencil (doc comment only).
-
-### Performance (to do before release)
-- On iPhone 15 the paint rate was 20–29 fps, with drawing taking 5–14 ms per frame on the main thread (4K source drawn into a 1179x2085 canvas). The preview felt a bit laggy, especially during capture.
-- Options:
-  - draw at 2x instead of 3x device pixels (a benchmark measured 29.6 vs 27.5 fps);
-  - skip painting while the frozen-capture overlay is showing;
-  - lower the preview stream resolution and raise it only for each capture (`Scanner.dynamicCapture` already supports this).
-- WebGL was slower (16.6 fps).
+In `src/ui/components/shared/idv-video/` (`idv-video.tsx`, `idv-video.scss`):
+- **The SDK's `<video>` (now `.idv-video-sink`) is unchanged for the SDK.** `getVideoRef()` still returns it, and the SDK still binds the camera to it, reads frames from it, records it, styles it and pauses it. It's now `visibility: hidden`, not `display: none`, so it keeps its box.
+- **A second `<video>` (`.idv-video-display`) plays the same `MediaStream` and is what the user sees.**
+  - It is created new for each stream, and only after the render that shows the preview (`componentDidRender`), so it's never attached while hidden.
+  - It's removed when the preview is hidden or the stream is removed (`emptied`).
+  - It pauses when the sink pauses.
+  - It copies the sink's inline `opacity`, `transition` and `transform`, so the fade-in and webcam mirroring still work.
+- Video is still composited natively by the browser: no timers, no per-frame script and no canvas.
+- No other SDK files changed. `src/components.d.ts` is regenerated by Stencil (doc comment only).
 
 ### Tests
-- `npx stencil test --spec -- src/ui/components/id-scan` passes (89/89). No unit tests cover painting, so it needs testing on devices.
-- Not yet tested on other iPhones, in the Slack in-app browser, on Android, on desktop, in landscape, or in face scan (which also uses `idv-video`, hidden).
+- `npx stencil test --spec -- src/ui/components/id-scan src/core/lib` passes (138/138).
+- Tested on iPhone 15 Safari only. Still to test:
+  - other iPhones and iOS versions;
+  - the Slack in-app browser;
+  - Android, desktop, landscape and the desktop embed layout;
+  - face scan, which also uses `idv-video`. It passes `visible={false}`, so no display element is created there.
 
-### Note (not fixed)
+## Reverted: earlier attempts, not in the final fix
+1. **1080p preview on high-tier iPhones** (`core/lib/DeviceProfiler.ts`). It had no effect, because the bug happens at 1080p too. Never shared.
+2. **The "1px / 700 ms relayout" delay** (`idv-video.tsx`). It worked on the first open only, and it depended on timing tuned on one phone. Shared earlier; `from-delay-fix.patch` removes it.
+3. **Hiding the preview with `opacity` instead of `display: none`** (`idv-video.scss`). Still small in the SDK. Never shared.
+4. **Re-attaching the stream on `playing` and after each capture** (`Camera.ts`, `Scanner.ts`). Re-attaching doesn't fix a stuck element. Never shared.
+5. **Canvas-drawn preview** (`idv-video.tsx`, `idv-video.scss`). It fixed the layout, but drawing every 4K frame took 7–18 ms on the main thread, and recognition started failing after a few captures. Shared earlier; `from-canvas-fix.patch` removes it.
+
+## Note (not fixed)
 `detectIphoneModel()` reports iPhone 15 as gen 14, because they have the same screen size. It makes no difference to the tier.
 
 ## Test harness only (`app/`, not the SDK; don't ship)
